@@ -332,8 +332,40 @@
   }
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 
-  .login-gate{
-    text-align:center; padding:60px 20px;
+  /* ---------- RESPONSIVO MOBILE ---------- */
+  @media (max-width: 520px){
+    .topbar{ padding:16px 12px 0; }
+    .brand h1{ font-size:18px; }
+    .app{ padding:0 10px 80px; }
+    .song-card{ flex-wrap:wrap; gap:8px; padding:12px; }
+    .song-actions{
+      width:100%; display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(72px,1fr));
+      gap:6px;
+    }
+    .cifra-link{ font-size:11px; padding:6px 7px; justify-content:center; }
+    .icon-btn{ width:34px; height:34px; }
+    .field-row{ flex-direction:column; gap:0; }
+    .modal{ padding:18px 14px 24px; }
+    .modal-actions{ flex-direction:column; }
+    .modal-actions .btn{ width:100%; justify-content:center; }
+    .btn{ font-size:13px; }
+    .tab{ padding:10px 10px 11px; font-size:13px; gap:5px; }
+    .tab svg{ width:15px; height:15px; }
+    .setlist-header{ padding:16px 14px 12px; }
+    .setlist-body{ padding:10px 14px 16px; }
+    .agenda-card{ padding:12px; }
+    .team-grid{ gap:6px; }
+    .ouv-link-btn{ padding:10px 12px; font-size:13px; }
+  }
+  @media (max-width: 360px){
+    .brand h1{ font-size:15px; }
+    .admin-pill{ font-size:10px; padding:5px 8px; }
+  }
+  @media (hover: none) and (pointer: coarse){
+    .btn:active{ transform:scale(0.96); }
+    .tab{ min-height:44px; }
+    .icon-btn{ min-width:40px; min-height:40px; }
   }
 </style>
 </head>
@@ -449,11 +481,13 @@ const KEYS_OF_NOTE = ['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab
 
 let state = {
   songs: [],
-  mural: { date:'', items:[] },
+  murals: [],
   agenda: [],
   tagDefs: [],
   voices: {},
   apoio: {},
+  knownNames: [],
+  knownRoles: [],
   isAdmin: false,
   catFilter: 'musica',
 };
@@ -558,15 +592,24 @@ function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(
 
 async function loadKey(key, fallback){
   try{
-    const res = await window.storage.get(key, true);
-    return res ? JSON.parse(res.value) : fallback;
+    if(window.storage){
+      const res = await window.storage.get(key, true);
+      return res ? JSON.parse(res.value) : fallback;
+    }
+    const val = localStorage.getItem(key);
+    return val !== null ? JSON.parse(val) : fallback;
   }catch(e){ return fallback; }
 }
 async function saveKey(key, value){
   try{
-    const res = await window.storage.set(key, JSON.stringify(value), true);
-    if(!res) showToast('Não foi possível salvar agora. Tente de novo.');
-    return res;
+    const json = JSON.stringify(value);
+    if(window.storage){
+      const res = await window.storage.set(key, json, true);
+      if(!res) showToast('Não foi possível salvar agora. Tente de novo.');
+      return res;
+    }
+    localStorage.setItem(key, json);
+    return true;
   }catch(e){ showToast('Não foi possível salvar agora. Tente de novo.'); return null; }
 }
 
@@ -1063,22 +1106,13 @@ document.getElementById('searchInput').addEventListener('input', renderCatalog);
 document.getElementById('filterTom').addEventListener('change', renderCatalog);
 
 /* ================= MURAL ================= */
-function renderMural(){
-  const wrap = document.getElementById('muralWrap');
-  if(!state.mural.date || !state.mural.items || state.mural.items.length===0){
-    wrap.innerHTML = emptyState(
-      '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/>',
-      'O mural ainda não foi montado',
-      state.isAdmin ? 'Clique em "Editar mural" para escolher as músicas do próximo culto.' : 'Em breve o líder de louvor vai escolher as músicas do próximo domingo.'
-    );
-    return;
-  }
-  const items = [...state.mural.items].sort((a,b)=>a.order-b.order);
-  wrap.innerHTML = `
-    <div class="setlist-card">
-      <div class="setlist-header">
+function muralSetlistHtml(m, isPast){
+  const items = [...m.items].sort((a,b)=>a.order-b.order);
+  return `
+    <div class="setlist-card" style="${isPast?'opacity:0.8;':''}" >
+      <div class="setlist-header" style="${isPast?'background:var(--ink-soft);':''}" >
         <p class="eyebrow">Repertório de</p>
-        <h3>${fmtDateLong(state.mural.date)}</h3>
+        <h3>${fmtDateLong(m.date)}</h3>
       </div>
       <div class="setlist-divider"></div>
       <div class="setlist-body">
@@ -1088,7 +1122,7 @@ function renderMural(){
           return `<div class="setlist-item">
             <span class="setlist-num">${String(i+1).padStart(2,'0')}</span>
             <div class="setlist-info">
-              ${it.moment ? `<p class="setlist-moment">${escapeHtml(it.moment)}</p>`:''}
+              ${it.moment?`<p class="setlist-moment">${escapeHtml(it.moment)}</p>`:''}
               <p class="setlist-song">${escapeHtml(song.title)}</p>
               ${song.artist?`<p class="setlist-artist">${escapeHtml(song.artist)}</p>`:''}
             </div>
@@ -1096,22 +1130,61 @@ function renderMural(){
           </div>`;
         }).join('')}
       </div>
-    </div>
-  `;
+    </div>`;
+}
+
+function renderMural(){
+  const wrap = document.getElementById('muralWrap');
+  const today = new Date().toISOString().slice(0,10);
+  const current = state.murals.filter(m=>m.date >= today).sort((a,b)=>a.date.localeCompare(b.date));
+  const past = state.murals.filter(m=>m.date < today).sort((a,b)=>b.date.localeCompare(a.date));
+
+  if(state.murals.length===0){
+    wrap.innerHTML = emptyState(
+      '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/>',
+      'O mural ainda não foi montado',
+      state.isAdmin ? 'Clique em "Editar mural" para escolher as músicas do próximo culto.' : 'Em breve o líder de louvor vai escolher as músicas do próximo domingo.'
+    );
+    return;
+  }
+
+  let html = '';
+  if(current.length === 0){
+    html += emptyState('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/>', 'Nenhum culto futuro no mural', state.isAdmin ? 'Crie um novo mural para o próximo culto.' : 'Aguarde o líder publicar o próximo mural.');
+  } else {
+    html += current.map(m=>muralSetlistHtml(m,false)).join('');
+  }
+
+  if(past.length > 0){
+    html += `
+      <details style="margin-top:18px;">
+        <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--line);font-size:13px;font-weight:600;color:var(--muted);user-select:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><path d="M6 9l6 6 6-6"/></svg>
+          Cultos anteriores (${past.length})
+        </summary>
+        <div style="margin-top:10px;">
+          ${past.map(m=>muralSetlistHtml(m,true)).join('')}
+        </div>
+      </details>`;
+  }
+  wrap.innerHTML = html;
 }
 
 function openMuralModal(){
   if(state.songs.length===0){
     openModal(`
-      <div class="modal-head"><h3>Editar mural</h3><button class="icon-btn" onclick="closeModal()" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+      <div class="modal-head"><h3>Novo mural</h3><button class="icon-btn" onclick="closeModal()" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
       <p style="font-size:13.5px;color:var(--muted)">Adicione músicas ao catálogo primeiro, antes de montar o mural.</p>
       <div class="modal-actions"><button class="btn btn-dark" onclick="closeModal()">Entendi</button></div>
     `);
     return;
   }
-  const date = state.mural.date || nextSundayISO();
-  const items = state.mural.items && state.mural.items.length ? [...state.mural.items].sort((a,b)=>a.order-b.order) : [];
+  const today = new Date().toISOString().slice(0,10);
+  const existing = state.murals.filter(m=>m.date>=today).sort((a,b)=>a.date.localeCompare(b.date))[0];
+  const date = existing?.date || nextSundayISO();
+  const items = existing?.items ? [...existing.items].sort((a,b)=>a.order-b.order) : [];
   window._muralDraft = JSON.parse(JSON.stringify(items));
+  window._muralEditId = existing?.id || null;
   openModal(`
     <div class="modal-head">
       <h3>Editar mural</h3>
@@ -1119,11 +1192,11 @@ function openMuralModal(){
     </div>
     <div class="field"><label>Data do culto</label><input class="input" type="date" id="m_date" value="${date}"></div>
     <div class="field"><label>Adicionar música</label>
-      <div style="display:flex; gap:8px;">
-        <select class="input" id="m_songSelect" style="flex:1;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <select class="input" id="m_songSelect" style="flex:2; min-width:140px;">
           ${state.songs.slice().sort((a,b)=>a.title.localeCompare(b.title,'pt-BR')).map(s=>`<option value="${s.id}">${escapeHtml(s.title)}</option>`).join('')}
         </select>
-        <input class="input" id="m_moment" placeholder="Momento (ex: Abertura)" style="flex:1;">
+        <input class="input" id="m_moment" placeholder="Momento (ex: Abertura)" style="flex:1; min-width:120px;">
         <button class="btn btn-sm" onclick="muralAddItem()">+</button>
       </div>
     </div>
@@ -1164,8 +1237,8 @@ function muralAddItem(){
 function muralMove(i, dir){
   const arr = window._muralDraft;
   const j = i+dir;
-  if(j<0 || j>=arr.length) return;
-  [arr[i],arr[j]] = [arr[j],arr[i]];
+  if(j<0||j>=arr.length) return;
+  [arr[i],arr[j]]=[arr[j],arr[i]];
   renderMuralDraftItems();
 }
 function muralRemove(i){
@@ -1174,12 +1247,20 @@ function muralRemove(i){
 }
 async function saveMural(){
   const date = document.getElementById('m_date').value;
-  const items = window._muralDraft.map((it,i)=>({...it, order:i}));
-  state.mural = {date, items};
-  await saveKey('mural__v1', state.mural);
+  const items = window._muralDraft.map((it,i)=>({...it,order:i}));
+  if(window._muralEditId){
+    const m = state.murals.find(m=>m.id===window._muralEditId);
+    if(m){ m.date=date; m.items=items; }
+    else  { state.murals.push({id:uid(),date,items}); }
+  } else {
+    const existing = state.murals.find(m=>m.date===date);
+    if(existing){ existing.items=items; }
+    else         { state.murals.push({id:uid(),date,items}); }
+  }
+  await saveKey('murals__v1', state.murals);
   closeModal();
   renderMural();
-  showToast('Mural atualizado.');
+  showToast('Mural salvo.');
 }
 
 /* ================= AGENDA ================= */
@@ -1254,10 +1335,12 @@ function openEventModal(id){
       <div class="field" style="max-width:120px;"><label>Horário</label><input class="input" type="time" id="e_time" value="${escapeHtml(ev?.time||'')}"></div>
     </div>
     <div class="field"><label>Observação</label><input class="input" id="e_desc" value="${escapeHtml(ev?.desc||'')}" placeholder="Ex: Culto de domingo, Ensaio geral..."></div>
+    <datalist id="dl_names">${state.knownNames.map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
+    <datalist id="dl_roles">${state.knownRoles.map(r=>`<option value="${escapeHtml(r)}">`).join('')}</datalist>
     <div class="field"><label>Escala</label>
       <div style="display:flex; gap:8px;">
-        <input class="input" id="t_name" placeholder="Nome" style="flex:1;">
-        <input class="input" id="t_role" placeholder="Função (ex: vocal)" style="flex:1;">
+        <input class="input" id="t_name" placeholder="Nome" list="dl_names" style="flex:1;">
+        <input class="input" id="t_role" placeholder="Função (ex: vocal)" list="dl_roles" style="flex:1;">
         <button class="btn btn-sm" onclick="teamAdd()">+</button>
       </div>
     </div>
@@ -1281,7 +1364,7 @@ function renderTeamDraft(){
       <button class="icon-btn" onclick="teamRemove(${i})" aria-label="Remover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>`).join('')}</div>`;
 }
-function teamAdd(){
+async function teamAdd(){
   const name = document.getElementById('t_name').value.trim();
   const role = document.getElementById('t_role').value.trim();
   if(!name) return;
@@ -1289,6 +1372,10 @@ function teamAdd(){
   document.getElementById('t_name').value='';
   document.getElementById('t_role').value='';
   renderTeamDraft();
+  let changed = false;
+  if(!state.knownNames.includes(name)){ state.knownNames.push(name); changed=true; }
+  if(role && !state.knownRoles.includes(role)){ state.knownRoles.push(role); changed=true; }
+  if(changed) await saveKey('teamKnown__v1', {names:state.knownNames, roles:state.knownRoles});
 }
 function teamRemove(i){ window._teamDraft.splice(i,1); renderTeamDraft(); }
 
@@ -1622,11 +1709,19 @@ async function init(){
   renderTabs();
   switchTab('catalogo');
   state.songs = await loadKey('songs__v1', []);
-  state.mural = await loadKey('mural__v1', {date:'', items:[]});
+  // migração: se existir mural antigo (objeto único), converte para array
+  const oldMural = await loadKey('mural__v1', null);
+  const newMurals = await loadKey('murals__v1', null);
+  if(newMurals){ state.murals = newMurals; }
+  else if(oldMural && oldMural.date){ state.murals = [{id:uid(), date:oldMural.date, items:oldMural.items||[]}]; await saveKey('murals__v1', state.murals); }
+  else { state.murals = []; }
   state.agenda = await loadKey('agenda__v1', []);
   state.tagDefs = await loadKey('tagDefs__v1', []);
   state.voices = await loadKey('voices__v1', {});
   state.apoio = await loadKey('apoio__v1', {});
+  const teamKnown = await loadKey('teamKnown__v1', {names:[],roles:[]});
+  state.knownNames = teamKnown.names||[];
+  state.knownRoles = teamKnown.roles||[];
   await importDriveBatch(true);
   renderAdminUI();
   renderCatalog();
