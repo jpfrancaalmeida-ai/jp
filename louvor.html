@@ -192,6 +192,33 @@
   .voz-file-label svg{width:16px;height:16px;flex:none;}
   #voz_fileInput{display:none;}
 
+  /* ---------- OUVIR / APOIO ---------- */
+  .ouv-link-btn{
+    display:flex; align-items:center; gap:10px;
+    width:100%; padding:11px 14px; border-radius:10px;
+    border:1px solid var(--line); background:var(--paper-raised);
+    font-size:13.5px; font-weight:500; text-decoration:none; color:var(--ink);
+    margin-bottom:8px;
+  }
+  .ouv-link-btn:last-child{margin-bottom:0;}
+  .ouv-link-btn:hover{border-color:var(--ink);}
+  .ouv-link-btn svg{width:18px;height:18px;flex:none;}
+  .ouv-platform-icon{width:18px;height:18px;flex:none;border-radius:4px;}
+  .apoio-row{
+    display:flex; align-items:flex-start; gap:10px; padding:10px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .apoio-row:last-child{border-bottom:none;}
+  .apoio-type-badge{
+    font-size:10px; text-transform:uppercase; letter-spacing:0.07em;
+    border:1px solid var(--line); border-radius:20px; padding:2px 8px;
+    color:var(--ink-soft); flex:none; margin-top:2px;
+  }
+  .apoio-info{flex:1; min-width:0;}
+  .apoio-nome{font-size:13px; font-weight:500; margin:0 0 4px;}
+  .apoio-texto-body{font-size:12.5px; color:var(--ink-soft); white-space:pre-wrap; background:var(--paper); border:1px solid var(--line); border-radius:7px; padding:8px 10px; margin:4px 0 0;}
+  #apoio_fileInput{display:none;}
+
   /* ---------- EMPTY STATE ---------- */
   .empty{
     text-align:center; padding:48px 20px; border:1px dashed var(--line-strong); border-radius:var(--radius);
@@ -426,6 +453,7 @@ let state = {
   agenda: [],
   tagDefs: [],
   voices: {},
+  apoio: {},
   isAdmin: false,
   catFilter: 'musica',
 };
@@ -819,13 +847,17 @@ function renderCatalog(){
               Cifra
             </a>`
           : `<span class="cifra-none">sem cifra</span>`}
-        <a class="cifra-link" href="${youtubeSearchUrl(s.title, s.artist)}" target="_blank" rel="noopener" title="Buscar no YouTube">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="3"/><path d="m10 9 5 3-5 3z"/></svg>
-          YouTube
-        </a>
+        <button class="cifra-link" onclick="openOuvirModal('${s.id}')" title="Ouvir">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+          Ouvir${(s.streamLinks||[]).length ? ` (${s.streamLinks.length})` : ''}
+        </button>
         <button class="cifra-link" onclick="openVozesModal('${s.id}')" title="Vozes">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
           Vozes${(state.voices[s.id]||[]).length ? ` (${(state.voices[s.id]||[]).length})` : ''}
+        </button>
+        <button class="cifra-link" onclick="openApoioModal('${s.id}')" title="Apoio">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          Apoio${(state.apoio[s.id]||[]).length ? ` (${(state.apoio[s.id]||[]).length})` : ''}
         </button>
         ${state.isAdmin ? `
           <button class="icon-btn" onclick="openSongModal('${s.id}')" aria-label="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
@@ -844,10 +876,37 @@ function emptyState(iconPath, title, msg){
   </div>`;
 }
 
+function renderSongStreamLinks(){
+  const wrap = document.getElementById('f_streamLinksWrap');
+  if(!wrap) return;
+  const links = window._streamLinksDraft;
+  if(!links.length){ wrap.innerHTML=''; return; }
+  wrap.innerHTML = `<div class="repeater">${links.map((l,i)=>`
+    <div class="repeater-row">
+      <span style="font-size:12px;color:var(--muted);min-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(l.label||'Link')}</span>
+      <span class="input" style="flex:1;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:4px 8px;">${escapeHtml(l.url)}</span>
+      <button class="icon-btn" onclick="songStreamRemove(${i})" aria-label="Remover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>`).join('')}</div>`;
+}
+function songStreamAdd(){
+  const label = document.getElementById('f_streamLabel').value.trim();
+  const url = document.getElementById('f_streamUrl').value.trim();
+  if(!url) return;
+  window._streamLinksDraft.push({id:uid(), label:label||url, url});
+  document.getElementById('f_streamLabel').value='';
+  document.getElementById('f_streamUrl').value='';
+  renderSongStreamLinks();
+}
+function songStreamRemove(i){
+  window._streamLinksDraft.splice(i,1);
+  renderSongStreamLinks();
+}
+
 function openSongModal(id){
   const song = id ? state.songs.find(s=>s.id===id) : null;
   const cat = song?.category || state.catFilter || 'musica';
   const selectedTags = new Set(song?.tags||[]);
+  window._streamLinksDraft = JSON.parse(JSON.stringify(song?.streamLinks||[]));
   openModal(`
     <div class="modal-head">
       <h3>${song ? 'Editar' : 'Nova entrada'}</h3>
@@ -871,12 +930,22 @@ function openSongModal(id){
       <p class="hint">Não achou a tag? <button type="button" onclick="closeModal(); openTagManager();" style="background:none;border:none;color:var(--ink);text-decoration:underline;font:inherit;padding:0;cursor:pointer;">Gerencie as tags aqui</button> e depois volte pra editar.</p>
     </div>
     <div class="field"><label>Link da cifra (PDF, imagem ou Drive)</label><input class="input" id="f_link" value="${escapeHtml(song?.chordLink||'')}" placeholder="https://..."></div>
+    <div class="field">
+      <label>Links para ouvir (YouTube, Spotify, Deezer…)</label>
+      <div id="f_streamLinksWrap"></div>
+      <div style="display:flex; gap:8px; margin-top:6px;">
+        <input class="input" id="f_streamLabel" placeholder="Rótulo (ex: YouTube, Spotify)" style="flex:1;">
+        <input class="input" id="f_streamUrl" placeholder="https://..." style="flex:2;">
+        <button class="btn btn-sm" onclick="songStreamAdd()">+</button>
+      </div>
+    </div>
     <p class="error-msg" id="songError" style="display:none;">Dê um título para a música.</p>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
       <button class="btn btn-dark" onclick="saveSong(${song ? `'${song.id}'` : 'null'})">Salvar</button>
     </div>
   `);
+  renderSongStreamLinks();
 }
 
 function renderTagCheckboxes(selectedTags){
@@ -900,12 +969,13 @@ async function saveSong(id){
   const tom = document.getElementById('f_tom').value.trim();
   const tags = [...document.querySelectorAll('#f_tagsWrap input[type="checkbox"]:checked')].map(i=>i.value);
   const chordLink = document.getElementById('f_link').value.trim();
+  const streamLinks = window._streamLinksDraft || [];
 
   if(id){
     const s = state.songs.find(s=>s.id===id);
-    Object.assign(s, {title, artist, tom, tags, chordLink, category});
+    Object.assign(s, {title, artist, tom, tags, chordLink, category, streamLinks});
   } else {
-    state.songs.push({id:uid(), title, artist, tom, tags, chordLink, category});
+    state.songs.push({id:uid(), title, artist, tom, tags, chordLink, category, streamLinks});
   }
   await saveKey('songs__v1', state.songs);
   closeModal();
@@ -1247,6 +1317,190 @@ async function deleteEvent(id){
   showToast('Data removida.');
 }
 
+/* ================= OUVIR ================= */
+function platformIcon(label, url){
+  const l = (label+url).toLowerCase();
+  if(l.includes('spotify')) return `<svg viewBox="0 0 24 24" fill="currentColor" style="color:#1DB954;width:18px;height:18px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 14.43a.624.624 0 0 1-.86.21c-2.35-1.44-5.31-1.76-8.79-.96a.623.623 0 1 1-.28-1.22c3.81-.87 7.08-.5 9.72 1.11.3.18.39.56.21.86zm1.24-2.76a.78.78 0 0 1-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.16a.782.782 0 0 1-.97-.52.782.782 0 0 1 .52-.97c3.63-1.1 8.14-.57 11.23 1.32.37.23.48.71.26 1.07zm.11-2.87C14.96 8.85 9.82 8.67 6.88 9.56a.94.94 0 1 1-.54-1.8c3.37-1.02 8.97-.82 12.51 1.43a.94.94 0 0 1-.86 1.61z"/></svg>`;
+  if(l.includes('deezer')) return `<svg viewBox="0 0 24 24" fill="currentColor" style="color:#FF0092;width:18px;height:18px;"><path d="M18.19 14.4H24v1.5h-5.81zm0-3.6H24v1.5h-5.81zm0-3.6H24V8.7h-5.81zM0 17.4h5.81v1.5H0zm6.1 0h5.81v1.5H6.1zm6.09 0H18v1.5h-5.81zM6.1 13.8h5.81v1.5H6.1zm6.09 0H18v1.5h-5.81zm0-3.6H18v1.5h-5.81z"/></svg>`;
+  if(l.includes('youtube')) return `<svg viewBox="0 0 24 24" fill="currentColor" style="color:#FF0000;width:18px;height:18px;"><path d="M23.5 6.2a3.01 3.01 0 0 0-2.12-2.13C19.54 3.6 12 3.6 12 3.6s-7.54 0-9.38.5A3.01 3.01 0 0 0 .5 6.2 31.6 31.6 0 0 0 0 12a31.6 31.6 0 0 0 .5 5.8 3.01 3.01 0 0 0 2.12 2.12c1.84.5 9.38.5 9.38.5s7.54 0 9.38-.5a3.01 3.01 0 0 0 2.12-2.12A31.6 31.6 0 0 0 24 12a31.6 31.6 0 0 0-.5-5.8zM9.6 15.6V8.4l6.27 3.6-6.27 3.6z"/></svg>`;
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>`;
+}
+
+function openOuvirModal(songId){
+  const song = state.songs.find(s=>s.id===songId);
+  if(!song) return;
+  const links = song.streamLinks || [];
+  openModal(`
+    <div class="modal-head">
+      <h3>Ouvir — ${escapeHtml(song.title)}</h3>
+      <button class="icon-btn" onclick="closeModal()" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    ${links.length === 0
+      ? `<p style="font-size:13.5px;color:var(--muted);padding:12px 0;">Nenhum link adicionado ainda.${state.isAdmin ? ' Edite a música para adicionar links.' : ''}</p>`
+      : links.map(l=>`
+          <a class="ouv-link-btn" href="${escapeHtml(l.url)}" target="_blank" rel="noopener">
+            ${platformIcon(l.label, l.url)}
+            <span style="flex:1;">${escapeHtml(l.label||l.url)}</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;color:var(--muted);"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/></svg>
+          </a>`).join('')}
+    <div class="modal-actions" style="margin-top:14px;">
+      ${state.isAdmin ? `<button class="btn btn-ghost" onclick="closeModal(); openSongModal('${songId}')">Gerenciar links</button>` : ''}
+      <button class="btn btn-dark" onclick="closeModal()">Fechar</button>
+    </div>
+  `);
+}
+
+/* ================= APOIO ================= */
+const APOIO_TIPOS = ['Áudio','PDF','Texto','Outro'];
+
+function openApoioModal(songId){
+  const song = state.songs.find(s=>s.id===songId);
+  if(!song) return;
+  openModal(`
+    <div class="modal-head">
+      <h3>Apoio — ${escapeHtml(song.title)}</h3>
+      <button class="icon-btn" onclick="closeModal()" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div id="apoioListWrap"></div>
+    ${state.isAdmin ? `
+    <div class="voz-add-section">
+      <p style="font-size:12px; font-weight:600; color:var(--ink-soft); margin:0 0 10px;">Adicionar material</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Tipo</label>
+          <select class="input" id="apoio_tipo" style="width:100%;" onchange="apoioTipoChanged()">
+            ${APOIO_TIPOS.map(t=>`<option value="${t}">${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field" style="flex:2;">
+          <label>Nome / descrição</label>
+          <input class="input" id="apoio_nome" placeholder="Ex: Violão — arranjo da equipe" style="width:100%;">
+        </div>
+      </div>
+      <div id="apoio_inputWrap">
+        <div class="field">
+          <label>Arquivo (áudio ou PDF)</label>
+          <label class="voz-file-label" for="apoio_fileInput">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            <span id="apoio_fileLabel">Selecionar arquivo…</span>
+          </label>
+          <input type="file" id="apoio_fileInput" accept="audio/*,application/pdf" onchange="apoioFileSelected(this)">
+        </div>
+      </div>
+      <p class="error-msg" id="apoioError" style="display:none;">Adicione um arquivo ou texto.</p>
+      <div class="modal-actions" style="margin-top:10px;">
+        <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
+        <button class="btn btn-dark" onclick="addApoio('${songId}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
+          Salvar material
+        </button>
+      </div>
+    </div>` : `
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn btn-dark" onclick="closeModal()">Fechar</button>
+    </div>`}
+  `);
+  renderApoioList(songId);
+}
+
+function apoioTipoChanged(){
+  const tipo = document.getElementById('apoio_tipo').value;
+  const wrap = document.getElementById('apoio_inputWrap');
+  if(tipo === 'Texto'){
+    wrap.innerHTML = `<div class="field"><label>Texto</label><textarea class="input" id="apoio_texto" rows="4" placeholder="Cole ou escreva o texto de apoio aqui…" style="width:100%;"></textarea></div>`;
+  } else {
+    const accept = tipo === 'PDF' ? 'application/pdf' : tipo === 'Áudio' ? 'audio/*' : '*/*';
+    wrap.innerHTML = `<div class="field">
+      <label>Arquivo</label>
+      <label class="voz-file-label" for="apoio_fileInput">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        <span id="apoio_fileLabel">Selecionar arquivo…</span>
+      </label>
+      <input type="file" id="apoio_fileInput" accept="${accept}" onchange="apoioFileSelected(this)">
+    </div>`;
+  }
+}
+
+function apoioFileSelected(input){
+  const label = document.getElementById('apoio_fileLabel');
+  if(label && input.files && input.files[0]) label.textContent = input.files[0].name;
+}
+
+function renderApoioList(songId){
+  const wrap = document.getElementById('apoioListWrap');
+  if(!wrap) return;
+  const items = state.apoio[songId] || [];
+  if(items.length === 0){
+    wrap.innerHTML = `<p class="voz-empty">Nenhum material adicionado ainda.</p>`;
+    return;
+  }
+  wrap.innerHTML = `<div style="margin-bottom:6px;">${items.map(item=>`
+    <div class="apoio-row">
+      <span class="apoio-type-badge">${escapeHtml(item.tipo)}</span>
+      <div class="apoio-info">
+        <p class="apoio-nome">${escapeHtml(item.nome||item.tipo)}</p>
+        ${item.tipo==='Texto'
+          ? `<div class="apoio-texto-body">${escapeHtml(item.texto||'')}</div>`
+          : item.dataUrl
+            ? item.tipo==='Áudio' || item.dataUrl.startsWith('data:audio')
+              ? `<audio controls src="${item.dataUrl}" style="width:100%;height:36px;margin-top:4px;"></audio>`
+              : `<a href="${item.dataUrl}" download="${escapeHtml(item.nome||'arquivo')}" class="cifra-link" style="display:inline-flex;margin-top:4px;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                  Baixar arquivo
+                </a>`
+            : ''}
+      </div>
+      ${state.isAdmin ? `<button class="icon-btn" onclick="deleteApoio('${songId}','${item.id}')" aria-label="Remover" style="flex:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+      </button>` : ''}
+    </div>`).join('')}</div>`;
+}
+
+async function addApoio(songId){
+  const tipo = document.getElementById('apoio_tipo').value;
+  const nome = (document.getElementById('apoio_nome')?.value||'').trim();
+  const errEl = document.getElementById('apoioError');
+  errEl.style.display='none';
+
+  let item = {id:uid(), tipo, nome};
+
+  if(tipo === 'Texto'){
+    const texto = (document.getElementById('apoio_texto')?.value||'').trim();
+    if(!texto){ errEl.style.display='block'; return; }
+    item.texto = texto;
+  } else {
+    const fileInput = document.getElementById('apoio_fileInput');
+    if(!fileInput?.files?.[0]){ errEl.style.display='block'; return; }
+    item.dataUrl = await new Promise((resolve,reject)=>{
+      const r = new FileReader();
+      r.onload = e => resolve(e.target.result);
+      r.onerror = reject;
+      r.readAsDataURL(fileInput.files[0]);
+    });
+  }
+
+  if(!state.apoio[songId]) state.apoio[songId] = [];
+  state.apoio[songId].push(item);
+  await saveKey('apoio__v1', state.apoio);
+  renderApoioList(songId);
+  renderCatalog();
+  document.getElementById('apoio_nome').value='';
+  const fileInput = document.getElementById('apoio_fileInput');
+  if(fileInput) fileInput.value='';
+  const lbl = document.getElementById('apoio_fileLabel');
+  if(lbl) lbl.textContent='Selecionar arquivo…';
+  showToast('Material adicionado.');
+}
+
+async function deleteApoio(songId, itemId){
+  if(!confirm('Remover este material de apoio?')) return;
+  state.apoio[songId] = (state.apoio[songId]||[]).filter(i=>i.id!==itemId);
+  await saveKey('apoio__v1', state.apoio);
+  renderApoioList(songId);
+  renderCatalog();
+  showToast('Material removido.');
+}
+
 /* ================= VOZES ================= */
 const VOZ_TIPOS = ['Melodia','Tenor','Contralto','Soprano'];
 
@@ -1372,6 +1626,7 @@ async function init(){
   state.agenda = await loadKey('agenda__v1', []);
   state.tagDefs = await loadKey('tagDefs__v1', []);
   state.voices = await loadKey('voices__v1', {});
+  state.apoio = await loadKey('apoio__v1', {});
   await importDriveBatch(true);
   renderAdminUI();
   renderCatalog();
