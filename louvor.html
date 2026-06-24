@@ -560,6 +560,11 @@ function fmtDateShort(dateStr){
   const d = new Date(dateStr+'T12:00:00');
   return d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'});
 }
+function fmtTime(t){
+  if(!t) return '';
+  const [h,m] = t.split(':');
+  return `${h}h${m && m!=='00' ? m : ''}`;
+}
 function nextSundayISO(){
   const d = new Date();
   const diff = (7 - d.getDay()) % 7;
@@ -1112,7 +1117,7 @@ function renderAgenda(){
   const wrap = document.getElementById('agendaWrap');
   const today = new Date().toISOString().slice(0,10);
   const events = state.agenda.filter(e=>e.date >= today).sort((a,b)=>a.date.localeCompare(b.date));
-  const past = state.agenda.filter(e=>e.date < today);
+  const past = state.agenda.filter(e=>e.date < today).sort((a,b)=>b.date.localeCompare(a.date));
 
   if(state.agenda.length===0){
     wrap.innerHTML = emptyState(
@@ -1122,12 +1127,28 @@ function renderAgenda(){
     );
     return;
   }
-  if(events.length===0){
-    wrap.innerHTML = emptyState('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>', 'Sem datas futuras', 'Todas as datas cadastradas já passaram.');
-    return;
+
+  let html = '';
+  if(events.length === 0){
+    html += emptyState('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>', 'Sem datas futuras', 'Todas as datas cadastradas já passaram.');
+  } else {
+    html += events.map(e=>agendaCardHtml(e)).join('');
   }
 
-  wrap.innerHTML = events.map(e=>agendaCardHtml(e)).join('');
+  if(past.length > 0){
+    html += `
+      <details style="margin-top:18px;">
+        <summary style="cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px; padding:10px 0; border-top:1px solid var(--line); font-size:13px; font-weight:600; color:var(--muted); user-select:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;transition:transform 0.2s;" class="past-chevron"><path d="M6 9l6 6 6-6"/></svg>
+          Datas passadas (${past.length})
+        </summary>
+        <div style="margin-top:10px; opacity:0.75;">
+          ${past.map(e=>agendaCardHtml(e)).join('')}
+        </div>
+      </details>`;
+  }
+
+  wrap.innerHTML = html;
 }
 
 function agendaCardHtml(e){
@@ -1135,7 +1156,7 @@ function agendaCardHtml(e){
     <div class="agenda-top">
       <div>
         <p class="agenda-date">${fmtDateLong(e.date)}</p>
-        ${e.time ? `<p class="agenda-time">${escapeHtml(e.time)}</p>`:''}
+        ${e.time ? `<p class="agenda-time">${escapeHtml(fmtTime(e.time))}</p>`:''}
       </div>
       ${state.isAdmin ? `
         <div style="display:flex;gap:6px;">
@@ -1160,7 +1181,7 @@ function openEventModal(id){
     </div>
     <div class="field-row">
       <div class="field"><label>Data *</label><input class="input" type="date" id="e_date" value="${ev?.date||nextSundayISO()}"></div>
-      <div class="field" style="max-width:120px;"><label>Horário</label><input class="input" id="e_time" value="${escapeHtml(ev?.time||'')}" placeholder="19:00"></div>
+      <div class="field" style="max-width:120px;"><label>Horário</label><input class="input" type="time" id="e_time" value="${escapeHtml(ev?.time||'')}"></div>
     </div>
     <div class="field"><label>Observação</label><input class="input" id="e_desc" value="${escapeHtml(ev?.desc||'')}" placeholder="Ex: Culto de domingo, Ensaio geral..."></div>
     <div class="field"><label>Escala</label>
