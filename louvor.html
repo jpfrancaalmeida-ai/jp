@@ -7,6 +7,20 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCINdLifPvAaPvbl3qLLV-bCPL2_Vpd0do",
+    authDomain: "base-de-dados---louvor.firebaseapp.com",
+    projectId: "base-de-dados---louvor",
+    storageBucket: "base-de-dados---louvor.firebasestorage.app",
+    messagingSenderId: "1043025889799",
+    appId: "1:1043025889799:web:080417385d5ffbb8c2f8a2"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+</script>
 <style>
   :root{
     --ink:#121110;
@@ -592,23 +606,13 @@ function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(
 
 async function loadKey(key, fallback){
   try{
-    if(window.storage){
-      const res = await window.storage.get(key, true);
-      return res ? JSON.parse(res.value) : fallback;
-    }
-    const val = localStorage.getItem(key);
-    return val !== null ? JSON.parse(val) : fallback;
-  }catch(e){ return fallback; }
+    const doc = await db.collection('store').doc(key).get();
+    return doc.exists ? JSON.parse(doc.data().value) : fallback;
+  }catch(e){ console.warn('loadKey', key, e); return fallback; }
 }
 async function saveKey(key, value){
   try{
-    const json = JSON.stringify(value);
-    if(window.storage){
-      const res = await window.storage.set(key, json, true);
-      if(!res) showToast('Não foi possível salvar agora. Tente de novo.');
-      return res;
-    }
-    localStorage.setItem(key, json);
+    await db.collection('store').doc(key).set({ value: JSON.stringify(value) });
     return true;
   }catch(e){ showToast('Não foi possível salvar agora. Tente de novo.'); return null; }
 }
