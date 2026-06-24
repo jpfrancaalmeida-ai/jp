@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Louvor — Primeira Igreja Batista em Urucânia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#121110;
+    --ink-soft:#3a3733;
+    --paper:#faf8f4;
+    --paper-raised:#ffffff;
+    --line:#dedad2;
+    --line-strong:#b9b4a8;
+    --muted:#76716a;
+    --shadow-ink: rgba(18,17,16,0.08);
+    --radius: 14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  h1,h2,h3,.serif{font-family:'Fraunces',serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:inherit;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.01ms !important; transition-duration:0.01ms !important;}
+  }
+
+  .app{max-width:760px;margin:0 auto;padding:0 18px 90px;}
+
+  /* ---------- TOPBAR ---------- */
+  .topbar{
+    padding:28px 18px 0;
+    max-width:760px;margin:0 auto;
+  }
+  .brand-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px;}
+  .brand h1{font-size:26px;font-weight:600;line-height:1.15;margin:0;letter-spacing:-0.01em;}
+  .brand .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;letter-spacing:0.14em;text-transform:uppercase;
+    color:var(--muted); margin:0 0 4px;
+  }
+  .admin-pill{
+    font-size:11px; font-family:'JetBrains Mono',monospace;
+    border:1px solid var(--ink); padding:6px 10px; border-radius:20px;
+    white-space:nowrap; display:flex; align-items:center; gap:6px;
+  }
+  .admin-pill.on{background:var(--ink); color:var(--paper);}
+  .admin-pill button{background:none;border:none;color:inherit;font:inherit;padding:0;text-decoration:underline;}
+
+  /* ---------- TABS ---------- */
+  .tabs{
+    display:flex; gap:4px;
+    border-bottom:1px solid var(--line);
+    overflow-x:auto;
+    scrollbar-width:none;
+  }
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{
+    flex:0 0 auto;
+    display:flex; align-items:center; gap:7px;
+    padding:12px 14px 13px;
+    background:none; border:none;
+    font-size:14px; font-weight:500; color:var(--muted);
+    border-bottom:2px solid transparent;
+    margin-bottom:-1px;
+    white-space:nowrap;
+  }
+  .tab.active{color:var(--ink); border-bottom-color:var(--ink);}
+  .tab svg{width:17px;height:17px;flex:none;}
+
+  /* ---------- VIEW ---------- */
+  .view{display:none; padding-top:22px; animation:rise 0.35s ease both;}
+  .view.active{display:block;}
+  @keyframes rise{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;}}
+
+  .view-head{display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:16px; flex-wrap:wrap;}
+  .view-head h2{font-size:20px; font-weight:600; margin:0;}
+  .view-sub{font-size:13px; color:var(--muted); margin:2px 0 0;}
+
+  /* ---------- BUTTONS ---------- */
+  .btn{
+    border:1px solid var(--ink); background:var(--paper-raised); color:var(--ink);
+    padding:9px 15px; border-radius:9px; font-size:13.5px; font-weight:500;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .btn:active{transform:scale(0.98);}
+  .btn-dark{background:var(--ink); color:var(--paper-raised);}
+  .btn-ghost{border-color:var(--line); background:none;}
+  .btn-ghost:hover{border-color:var(--ink);}
+  .btn-sm{padding:6px 10px; font-size:12.5px; border-radius:7px;}
+  .btn-danger{border-color:#b53b3b; color:#b53b3b; background:none;}
+  .icon-btn{
+    width:30px;height:30px;border-radius:7px;border:1px solid var(--line);
+    background:var(--paper-raised); display:flex;align-items:center;justify-content:center;
+  }
+  .icon-btn:hover{border-color:var(--ink);}
+  .icon-btn svg{width:15px;height:15px;}
+
+  /* ---------- SEARCH/FILTER ---------- */
+  .toolbar{display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;}
+  .input, select.input{
+    border:1px solid var(--line); border-radius:9px; padding:9px 12px;
+    font-size:13.5px; background:var(--paper-raised); color:var(--ink);
+    outline:none;
+  }
+  .input:focus{border-color:var(--ink);}
+  .search-wrap{position:relative; flex:1; min-width:160px;}
+  .search-wrap .input{width:100%; padding-left:34px;}
+  .search-wrap svg{position:absolute; left:11px; top:50%; transform:translateY(-50%); width:15px;height:15px; color:var(--muted);}
+
+  /* ---------- SONG CARD ---------- */
+  .song-list{display:flex; flex-direction:column; gap:10px;}
+  .song-card{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px 16px; display:flex; align-items:center; gap:12px;
+  }
+  .song-main{flex:1; min-width:0;}
+  .song-title{font-size:15.5px; font-weight:600; margin:0 0 2px; font-family:'Fraunces',serif;}
+  .song-artist{font-size:12.5px; color:var(--muted); margin:0;}
+  .song-tags{display:flex; gap:6px; margin-top:7px; flex-wrap:wrap;}
+  .tag{
+    font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em;
+    background:var(--paper); border:1px solid var(--line); color:var(--ink-soft);
+    padding:2px 8px; border-radius:20px;
+  }
+  .cat-toggle{display:flex; gap:6px; margin-bottom:16px;}
+  .cat-toggle-btn{
+    border:1px solid var(--line); background:var(--paper-raised); color:var(--muted);
+    padding:7px 16px; border-radius:20px; font-size:13px; font-weight:500;
+  }
+  .cat-toggle-btn.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+  .tag-check{
+    display:inline-flex; align-items:center; gap:6px; border:1.5px solid var(--line);
+    border-radius:20px; padding:6px 12px 6px 8px; font-size:12.5px; cursor:pointer; margin:0 6px 6px 0;
+    user-select:none;
+  }
+  .tag-check input{accent-color:var(--ink);}
+  .tag-check .dot{width:10px;height:10px;border-radius:50%;flex:none;}
+  .tag-row{display:flex; align-items:center; gap:10px; border:1px solid var(--line); border-radius:11px; padding:9px 12px; margin-bottom:8px;}
+  .tag-row .dot{width:16px;height:16px;border-radius:50%;flex:none; border:1px solid rgba(0,0,0,0.15);}
+  .color-swatches{display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;}
+  .color-swatch{width:26px;height:26px;border-radius:50%; border:2px solid transparent; cursor:pointer;}
+  .color-swatch.selected{border-color:var(--ink);}
+  .tom-badge{
+    font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600;
+    border:1.5px solid var(--ink); border-radius:7px; padding:5px 9px;
+    min-width:38px; text-align:center; flex:none;
+  }
+  .song-actions{display:flex; gap:6px; flex:none;}
+  .cifra-link{
+    display:flex; align-items:center; gap:5px;
+    font-size:12.5px; font-weight:500; text-decoration:none;
+    border:1px solid var(--ink); border-radius:7px; padding:7px 10px;
+  }
+  .cifra-link svg{width:13px;height:13px;}
+  .cifra-none{font-size:11.5px; color:var(--muted); font-style:italic;}
+
+  /* ---------- VOZES ---------- */
+  .voz-type-badge{
+    font-size:10px; text-transform:uppercase; letter-spacing:0.07em;
+    border:1px solid var(--line); border-radius:20px; padding:2px 8px;
+    color:var(--ink-soft); flex:none;
+  }
+  .voz-row{
+    display:flex; align-items:center; gap:10px; padding:10px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .voz-row:last-child{border-bottom:none;}
+  .voz-audio{flex:1; height:36px; min-width:0;}
+  .voz-audio::-webkit-media-controls-panel{background:var(--paper);}
+  .voz-empty{text-align:center; padding:24px 0; color:var(--muted); font-size:13px;}
+  .voz-add-section{border-top:1px solid var(--line); margin-top:10px; padding-top:14px;}
+  .voz-file-label{
+    display:flex; align-items:center; gap:8px;
+    border:1.5px dashed var(--line-strong); border-radius:9px; padding:11px 14px;
+    cursor:pointer; font-size:13px; color:var(--muted); transition:border-color 0.15s;
+  }
+  .voz-file-label:hover{border-color:var(--ink); color:var(--ink);}
+  .voz-file-label svg{width:16px;height:16px;flex:none;}
+  #voz_fileInput{display:none;}
+
+  /* ---------- EMPTY STATE ---------- */
+  .empty{
+    text-align:center; padding:48px 20px; border:1px dashed var(--line-strong); border-radius:var(--radius);
+    color:var(--muted);
+  }
+  .empty svg{width:30px;height:30px; margin-bottom:10px; opacity:0.6;}
+  .empty p{margin:4px 0; font-size:13.5px;}
+  .empty .empty-title{font-family:'Fraunces',serif; font-size:16px; color:var(--ink); font-weight:600;}
+
+  /* ---------- SETLIST (MURAL) ---------- */
+  .setlist-card{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:18px;
+    overflow:hidden; margin-bottom:18px;
+  }
+  .setlist-header{
+    background:var(--ink); color:var(--paper); padding:22px 22px 18px; position:relative;
+  }
+  .setlist-header .eyebrow{font-size:11px; letter-spacing:0.14em; text-transform:uppercase; opacity:0.7; margin:0 0 6px;}
+  .setlist-header h3{font-size:23px; margin:0; font-weight:600; text-transform:capitalize;}
+  .setlist-divider{
+    height:0; border-top:2px dashed var(--line-strong); margin:0 22px;
+  }
+  .setlist-body{padding:16px 22px 20px;}
+  .setlist-item{
+    display:flex; align-items:flex-start; gap:14px; padding:13px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .setlist-item:last-child{border-bottom:none;}
+  .setlist-num{
+    font-family:'Fraunces',serif; font-weight:700; font-size:18px; color:var(--line-strong);
+    width:24px; flex:none; padding-top:1px;
+  }
+  .setlist-info{flex:1; min-width:0;}
+  .setlist-moment{font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin:0 0 2px;}
+  .setlist-song{font-family:'Fraunces',serif; font-size:16px; font-weight:600; margin:0;}
+  .setlist-artist{font-size:12px; color:var(--muted); margin:2px 0 0;}
+  .setlist-stamp{
+    transform:rotate(-3deg); font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600;
+    border:1.5px solid var(--ink); border-radius:6px; padding:4px 8px; flex:none;
+  }
+  .setlist-reorder{display:flex; flex-direction:column; gap:3px; flex:none;}
+
+  /* ---------- AGENDA ---------- */
+  .agenda-card{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px; margin-bottom:12px;
+  }
+  .agenda-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px;}
+  .agenda-date{
+    font-family:'Fraunces',serif; font-weight:600; font-size:15.5px; text-transform:capitalize; margin:0;
+  }
+  .agenda-time{font-size:12px; color:var(--muted); font-family:'JetBrains Mono',monospace; margin:2px 0 0;}
+  .agenda-desc{font-size:13px; color:var(--ink-soft); margin:0 0 10px;}
+  .team-grid{display:flex; flex-wrap:wrap; gap:8px;}
+  .team-chip{
+    display:flex; align-items:center; gap:7px;
+    border:1px solid var(--line); border-radius:20px; padding:5px 11px 5px 5px; font-size:12.5px;
+  }
+  .team-avatar{
+    width:20px; height:20px; border-radius:50%; background:var(--ink); color:var(--paper);
+    display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:700; flex:none;
+  }
+  .team-role{color:var(--muted); font-size:11px;}
+
+  /* ---------- ADMIN BANNER ---------- */
+  .admin-banner{
+    background:var(--ink); color:var(--paper); border-radius:11px; padding:10px 14px;
+    display:flex; align-items:center; gap:8px; font-size:12.5px; margin-bottom:16px;
+  }
+  .admin-banner svg{width:14px;height:14px; flex:none;}
+
+  /* ---------- MODAL ---------- */
+  .overlay{
+    position:fixed; inset:0; background:rgba(18,17,16,0.5); backdrop-filter:blur(2px);
+    display:none; align-items:flex-end; justify-content:center; z-index:50; padding:0;
+  }
+  .overlay.show{display:flex;}
+  @media (min-width:640px){
+    .overlay{align-items:center; padding:20px;}
+  }
+  .modal{
+    background:var(--paper); width:100%; max-width:480px; border-radius:20px 20px 0 0;
+    padding:22px 20px 28px; max-height:88vh; overflow-y:auto;
+    animation:slideUp 0.28s ease both;
+  }
+  @media (min-width:640px){ .modal{border-radius:18px; padding:26px;} }
+  @keyframes slideUp{from{transform:translateY(24px); opacity:0;} to{transform:none; opacity:1;}}
+  .modal-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;}
+  .modal-head h3{font-size:18px; margin:0;}
+  .field{margin-bottom:13px;}
+  .field label{display:block; font-size:12px; font-weight:600; color:var(--ink-soft); margin-bottom:5px;}
+  .field .input, .field select, .field textarea{width:100%; padding:10px 12px;}
+  .field textarea{resize:vertical; min-height:60px;}
+  .field-row{display:flex; gap:10px;}
+  .field-row .field{flex:1;}
+  .modal-actions{display:flex; gap:8px; margin-top:18px;}
+  .modal-actions .btn{flex:1; justify-content:center;}
+  .error-msg{font-size:12.5px; color:#b53b3b; margin:6px 0 0;}
+  .hint{font-size:11.5px; color:var(--muted); margin:4px 0 0;}
+
+  .repeater{border:1px solid var(--line); border-radius:11px; padding:10px; margin-bottom:10px;}
+  .repeater-row{display:flex; gap:8px; align-items:center; margin-bottom:8px;}
+  .repeater-row:last-child{margin-bottom:0;}
+  .repeater-row .input{flex:1;}
+
+  .toast{
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(40px);
+    background:var(--ink); color:var(--paper); padding:11px 18px; border-radius:30px;
+    font-size:13px; opacity:0; transition:all 0.3s ease; z-index:60; pointer-events:none;
+    white-space:nowrap; max-width:90vw; text-overflow:ellipsis; overflow:hidden;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  .login-gate{
+    text-align:center; padding:60px 20px;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand-row">
+    <div class="brand">
+      <p class="eyebrow">Ministério de louvor</p>
+      <h1>Primeira Igreja Batista<br>em Urucânia</h1>
+    </div>
+    <div id="adminPillWrap"></div>
+  </div>
+  <nav class="tabs" id="tabs"></nav>
+</div>
+
+<div class="app">
+  <div id="adminBannerWrap"></div>
+
+  <section class="view" id="view-catalogo">
+    <div class="view-head">
+      <div>
+        <h2>Catálogo</h2>
+        <p class="view-sub" id="catalogCount"></p>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost" id="btnManageTags" style="display:none;" onclick="openTagManager()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="m20.59 13.41-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z"/><circle cx="7" cy="7" r="1"/></svg>
+          Tags
+        </button>
+        <button class="btn btn-dark" id="btnAddSong" style="display:none;" onclick="openSongModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
+          Nova música
+        </button>
+      </div>
+    </div>
+    <div class="cat-toggle" id="catToggle">
+      <button class="cat-toggle-btn active" data-cat="musica" onclick="switchCategory('musica')">Músicas</button>
+      <button class="cat-toggle-btn" data-cat="hino" onclick="switchCategory('hino')">Hinos</button>
+    </div>
+    <div id="importBar" style="display:none;"></div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input class="input" id="searchInput" placeholder="Buscar música ou artista...">
+      </div>
+      <select class="input" id="filterTom"><option value="">Todos os tons</option></select>
+    </div>
+    <div class="song-list" id="songList"></div>
+  </section>
+
+  <section class="view" id="view-mural">
+    <div class="view-head">
+      <div>
+        <h2>Mural de domingo</h2>
+        <p class="view-sub">Repertório escolhido para o próximo culto</p>
+      </div>
+      <button class="btn btn-dark" id="btnEditMural" style="display:none;" onclick="openMuralModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        Editar mural
+      </button>
+    </div>
+    <div id="muralWrap"></div>
+  </section>
+
+  <section class="view" id="view-agenda">
+    <div class="view-head">
+      <div>
+        <h2>Agenda</h2>
+        <p class="view-sub">Próximas datas e escalas do louvor</p>
+      </div>
+      <button class="btn btn-dark" id="btnAddEvent" style="display:none;" onclick="openEventModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
+        Nova data
+      </button>
+    </div>
+    <div id="agendaWrap"></div>
+  </section>
+
+  <section class="view" id="view-login">
+    <div class="login-gate">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:34px;height:34px;margin-bottom:14px;"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      <h2 style="font-size:19px;margin:0 0 6px;">Modo líder</h2>
+      <p style="font-size:13.5px;color:var(--muted);margin:0 0 22px;">Entre com seu acesso de liderança para editar o catálogo, o mural e a agenda.</p>
+      <div style="max-width:280px;margin:0 auto;text-align:left;">
+        <div class="field">
+          <label>Usuário</label>
+          <input class="input" id="loginUser" placeholder="usuário">
+        </div>
+        <div class="field">
+          <label>Senha</label>
+          <input class="input" id="loginPass" type="password" placeholder="senha">
+        </div>
+        <p class="error-msg" id="loginError" style="display:none;">Usuário ou senha incorretos.</p>
+        <button class="btn btn-dark" style="width:100%;justify-content:center;margin-top:8px;" onclick="doLogin()">Entrar</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="overlay" id="overlay"><div class="modal" id="modalContent"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const TABS = [
+  {id:'catalogo', label:'Catálogo', icon:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'},
+  {id:'mural', label:'Mural', icon:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/><circle cx="8" cy="14" r="1"/><path d="M11 14h6M8 17h9"/>'},
+  {id:'agenda', label:'Agenda', icon:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>'},
+  {id:'login', label:'Líder', icon:'<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>'},
+];
+
+const KEYS_OF_NOTE = ['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B','Cm','C#m','Dm','D#m','Em','Fm','F#m','Gm','G#m','Am','A#m','Bm'];
+
+let state = {
+  songs: [],
+  mural: { date:'', items:[] },
+  agenda: [],
+  tagDefs: [],
+  voices: {},
+  isAdmin: false,
+  catFilter: 'musica',
+};
+
+const TAG_COLORS = ['#121110','#76716a','#b53b3b','#a8722f','#6b8f3f','#2f6f8f','#5a4fae','#a83f8f'];
+
+const DRIVE_IMPORT_BATCH_1 = [
+  {title:"Tua Unção", artist:"IB Nova Jerusalém", tom:"G", chordLink:"https://drive.google.com/file/d/1DXx-nqHv6Y5Wl7kLRwE_5ifD7DzyQffg/view", category:"musica"},
+  {title:"Emaús", artist:"", tom:"E", chordLink:"https://drive.google.com/file/d/1r3-vAD8KyOkLVkTRg8d9KlOp_JSZvfgW/view", category:"musica"},
+  {title:"Deus me ama", artist:"Thalles Roberto", tom:"A", chordLink:"https://drive.google.com/file/d/1ZZ9Ve-65odggDZKyQaJ5pvAWBbcC8c7v/view", category:"musica"},
+  {title:"Me ama", artist:"", tom:"A", chordLink:"https://drive.google.com/file/d/1zo3vGo3Tc2uvPV86f6wCV876_c4fZLmE/view", category:"musica"},
+  {title:"Grande é o Senhor", artist:"Adhemar de Campos", tom:"A", chordLink:"https://drive.google.com/file/d/1MbafcRnPT_twRuoohbX3UAZ7L02EUV47/view", category:"musica"},
+  {title:"Vida aos Sepulcros", artist:"Paulo César Baruk", tom:"A", chordLink:"https://drive.google.com/file/d/1ARee96BTwnFFC_jUW0wNCrPm-K9BkJyz/view", category:"musica"},
+  {title:"Eu me rendo", artist:"Renascer Praise", tom:"B", chordLink:"https://drive.google.com/file/d/1k_fnHD_j4vo7AOlEkXvR5qZRz8kz0K7R/view", category:"musica"},
+  {title:"Águas Purificadoras", artist:"Diante do Trono", tom:"D", chordLink:"https://drive.google.com/file/d/1oij_JJ_EQJfMYqip876lgpWCSAXBBWFL/view", category:"musica"},
+  {title:"Rendido Estou", artist:"Aline Barros", tom:"D", chordLink:"https://drive.google.com/file/d/1nLTwsTDIIpN25QFukBdZSM3-BnEto4Ea/view", category:"musica"},
+  {title:"Poder Pra Salvar", artist:"Aline Barros", tom:"A", chordLink:"https://drive.google.com/file/d/1R5wvENC5SCNWfsfA5aK6Y6KNVrdoKhKK/view", category:"musica"},
+  {title:"Ressuscita-me", artist:"Aline Barros", tom:"D", chordLink:"https://drive.google.com/file/d/1xDLzjVjilHZEI4PkUE0lxWbjewj3SCKR/view", category:"musica"},
+  {title:"Agnus Dei", artist:"PIBU", tom:"A", chordLink:"https://drive.google.com/file/d/1_55pDJFWrPPZ_-0LBubnVMZ5gIUH0dVC/view", category:"musica"},
+  {title:"Alfa e Ômega", artist:"Marine Friesen", tom:"E", chordLink:"https://drive.google.com/file/d/16plWtX_HQJeGiwbyYXlER3YsAl0UIXMe/view", category:"musica"},
+  {title:"Vou Te Alegrar", artist:"Aline Barros", tom:"E", chordLink:"https://drive.google.com/file/d/18KrqYcX_uCj3kWGPOWI0B-1f49QG5Uep/view", category:"musica"},
+  {title:"Oferta agradável a ti", artist:"Cassiane", tom:"E", chordLink:"https://drive.google.com/file/d/1qOLaaGgC-E6TV0_MYSRkBirHkNGGfX0W/view", category:"musica"},
+  {title:"Minhas Guerras", artist:"Brasa Church Music", tom:"E", chordLink:"https://drive.google.com/file/d/1yw_rewWirD30dFhR4gNbMl2WQacjDP4E/view", category:"musica"},
+  {title:"Medley: Maranata + Tempo de guerra + Nosso General", artist:"", tom:"F", chordLink:"https://drive.google.com/file/d/1NrbMz1zWbIPoFm7TN8KLJsYsbwHcRSOb/view", category:"musica"},
+  {title:"Abre Senhor os meus olhos", artist:"", tom:"G", chordLink:"https://drive.google.com/file/d/1fYJ0rYCXPmm4zsQH6ZmACr9JUPrkkvg-/view", category:"musica"},
+  {title:"Amo o Senhor", artist:"Fernanda Brum", tom:"G", chordLink:"https://drive.google.com/file/d/1QPbe3BP9Whoc6o2COtn2KAqfMuxylbRX/view", category:"musica"},
+  {title:"Vem Cantar Louvores", artist:"Brás Adoração", tom:"G", chordLink:"https://drive.google.com/file/d/1aklqPW_QRn9p8psmNXJwGl-bLMzOEqOA/view", category:"musica"},
+  {title:"Santo Espírito", artist:"Paulo César Baruk", tom:"E", chordLink:"https://drive.google.com/file/d/1Fjq6SDQIK6FxyGGDWk6oKhp_csqXaR_j/view", category:"musica"},
+  {title:"Eu te Louvarei Meu Bom Jesus", artist:"Ronaldo Bezerra", tom:"E", chordLink:"https://drive.google.com/file/d/1MkdYazsQ7IMfSefg3VWtoxVzyhfI4k2s/view", category:"musica"},
+  {title:"Nada Temerei", artist:"Igreja Batista Atitude Central da Barra", tom:"C", chordLink:"https://drive.google.com/file/d/1FhsBDKPVocj1EH7pVRMB5mp1Eg_aJ5YL/view", category:"musica"},
+  {title:"Diante de Ti", artist:"Quatro por um", tom:"E", chordLink:"https://drive.google.com/file/d/1jqIB9tUb7Ef9nmHyxLf2Sms597T-Rh_O/view", category:"musica"},
+  {title:"Em Teus Braços", artist:"Laura Souguelis", tom:"F", chordLink:"https://drive.google.com/file/d/1XdFX0vuAb7omvhPr18SYE0q96-Uazp1l/view", category:"musica"},
+  {title:"Toda sorte de bênção", artist:"Toque no Altar", tom:"A", chordLink:"https://drive.google.com/file/d/1OQkJYdL51aYCnMNPhrqfig6df0wQvSIq/view", category:"musica"},
+  {title:"Aclame ao Senhor", artist:"", tom:"A", chordLink:"https://drive.google.com/file/d/1d4V2uAHT9itUAGOibfh4qUC02hxdAL8D/view", category:"musica"},
+  {title:"Pra sempre (Forever)", artist:"Ministério Avivah", tom:"G", chordLink:"https://drive.google.com/file/d/1Isz7Fj-_hj_7n7FkDNmJmrLhi-R_ofnj/view", category:"musica"},
+  {title:"Que Ele cresça", artist:"Deigma Marques", tom:"D", chordLink:"https://drive.google.com/file/d/1qIG6Nyc6CgMLZ9gFx9HVRRy7nQwMstwT/view", category:"musica"},
+  {title:"Eu te agradeço Deus", artist:"Kleber Lucas", tom:"F", chordLink:"https://drive.google.com/file/d/1FfGEU-_ShKJ9aKdJimludv-nBC4jYuPF/view", category:"musica"},
+  {title:"Só tu És Santo", artist:"Morada", tom:"A", chordLink:"https://drive.google.com/file/d/1TSId3vvEuj3CMrIvM02vWam7ESy5CVkE/view", category:"musica"},
+  {title:"Jesus, Em Tua Presença", artist:"Quatro Por Um", tom:"C", chordLink:"https://drive.google.com/file/d/1SbofZwbXmCSKzI-XnFI1GAJ3FYjZ_SPb/view", category:"musica"},
+  {title:"Vim Para Adorar-te", artist:"", tom:"E", chordLink:"https://drive.google.com/file/d/12mADeNOlQYQiw3ceJOgb9UA1A-wmcHh5/view", category:"musica"},
+  {title:"Me derramar", artist:"Vineyard", tom:"G", chordLink:"https://drive.google.com/file/d/1EzPYs_63I3BVVyxAwII96WAa2BvfoUxu/view", category:"musica"},
+  {title:"Jesus Cristo Mudou Meu Viver", artist:"", tom:"A", chordLink:"https://drive.google.com/file/d/1niILleIm-Bf1K1fOQOjNgOJMsAjumjH-/view", category:"musica"},
+  {title:"Teus Sonhos", artist:"Fernandinho", tom:"G", chordLink:"https://drive.google.com/file/d/1b8xDyAgKfeI4idCbeYgvKaYwMpiqiiw2/view", category:"musica"},
+  {title:"Venha o Teu Reino", artist:"Davi Sacer", tom:"F", chordLink:"https://drive.google.com/file/d/1yTh7kEAN22rRR3aW3uXZJmgnsbPMXYHL/view", category:"musica"},
+  {title:"Cria em mim", artist:"", tom:"C", chordLink:"https://drive.google.com/file/d/1zAz4A8PU4IuFxlAv-Ub9VCfgp6M8b2Wz/view", category:"musica"},
+  {title:"Quão Grande é o Meu Deus + Grandioso és tu", artist:"", tom:"G", chordLink:"https://drive.google.com/file/d/1pFQHRcQaR16s_u8a-KMLGVftjMb9nM70/view", category:"musica"},
+  {title:"Lugar Secreto", artist:"Gabriela Rocha", tom:"C", chordLink:"https://drive.google.com/file/d/1Mlv28Yku65ZfU2apXt0jmM2wHRujp8Zu/view", category:"musica"},
+  {title:"Descansarei", artist:"Com. Ev. de Maringá", tom:"C", chordLink:"https://drive.google.com/file/d/1qqQtvyNU3Uo48-rl1myXKmV6Ynj5ffJ1/view", category:"musica"},
+  {title:"Atos 2", artist:"Gabriela Rocha", tom:"G", chordLink:"https://drive.google.com/file/d/18yP2jSEVez7Tm8MvyOOh7ZA-x9RJIQpa/view", category:"musica"},
+  {title:"Com Muito Louvor", artist:"Cassiane", tom:"A", chordLink:"https://drive.google.com/file/d/1P18rPR6a-fLHTRjYMklNlmhN1sZY_mZQ/view", category:"musica"},
+  {title:"Jesus, Filho de Deus", artist:"Fernandinho", tom:"B", chordLink:"https://drive.google.com/file/d/13TwiWeVFoLhdcQK6AHbxvAJOuDgAw6Fy/view", category:"musica"},
+  {title:"Reina em Mim", artist:"Vineyard", tom:"C", chordLink:"https://drive.google.com/file/d/131jvCo4dSf3-BCS74eTOJQ85tUeODnq5/view", category:"musica"},
+  {title:"Te Agradeço", artist:"Diante do Trono", tom:"D", chordLink:"https://drive.google.com/file/d/1Jx4iCjkp-qmLIjOJuzDtgqYOlzpVNPoH/view", category:"musica"},
+  {title:"Filho do Deus Vivo (Cristo, Filho do Deus Vivo)", artist:"Nívea Soares", tom:"E", chordLink:"https://drive.google.com/file/d/1M1wa-2MBPrPAQa7_vq9JYnRJGlFhvMRA/view", category:"musica"},
+  {title:"Teu amor não falha", artist:"Nívea Soares", tom:"C", chordLink:"https://drive.google.com/file/d/1U17nImee1x8jhnNxveq6wRXP-iRi6UNd/view", category:"musica"},
+  {title:"Ao erguermos as mãos", artist:"Aline Barros", tom:"C", chordLink:"https://drive.google.com/file/d/1YWAamPNxEh3zLfMpk6g1JFZRfmHaWCzt/view", category:"musica"},
+  {title:"Tu És", artist:"FHOP", tom:"D", chordLink:"https://drive.google.com/file/d/1EtcgxRWfJVQGAxs-GsCeLh5O0kNLvNOg/view", category:"musica"},
+  {title:"Maranata", artist:"Ministério Avivah", tom:"Eb", chordLink:"https://drive.google.com/file/d/1h477Dr5N97_mpMSwTqUivU4f2ismRgT4/view", category:"musica"},
+  {title:"Seu Sangue", artist:"Fernandinho", tom:"A", chordLink:"https://drive.google.com/file/d/1u75Q1vB9v95TOjuq2dnmeh1iJzP4lFoG/view", category:"musica"},
+  {title:"Jesus, o plano Perfeito", artist:"Renascer Praise", tom:"E", chordLink:"https://drive.google.com/file/d/13DXrglq1NEQ9jLoTK3H4SygFrcWTriM8/view", category:"musica"},
+  {title:"Senhor, Te Quero", artist:"Vineyard", tom:"G", chordLink:"https://drive.google.com/file/d/17VjsA4oXE6_XDEj04qPCfEPG7SfWZZ7u/view", category:"musica"},
+  {title:"Pedro, Tiago e João no Barquinho", artist:"Aline Barros", tom:"C", chordLink:"https://drive.google.com/file/d/1arJzXVSa3z2k0DoTXICrxnojKMg1y4PG/view", category:"musica"},
+  {title:"Digno é o Senhor", artist:"Aline Barros", tom:"G", chordLink:"https://drive.google.com/file/d/1GTEAt8h-fjFlKzUhvyxspeQEVjV5h6Uz/view", category:"musica"},
+  {title:"Oh Quão Lindo Este Nome É", artist:"Kemuel", tom:"D", chordLink:"https://drive.google.com/file/d/1-nk348gFIfbuxGIi-IBIDLl21l1OBnqY/view", category:"musica"},
+  {title:"Canção do Apocalipse", artist:"PIBU", tom:"D", chordLink:"https://drive.google.com/file/d/1qJIya715CK48wrNhmscbhHZFdfHJSdzh/view", category:"musica"},
+  {title:"Bem Mais Que Tudo", artist:"Aline Barros", tom:"G", chordLink:"https://drive.google.com/file/d/1Qpv4wqCkji4BErVOy7IUetPFdXgCK-ew/view", category:"musica"},
+  {title:"Se Eu me Humilhar", artist:"Discopraise", tom:"", chordLink:"https://drive.google.com/file/d/12IECGwILLtJ1V0Y5HpggHOuRWJ1X1HVQ/view", category:"musica"},
+  {title:"Meu Prazer", artist:"", tom:"A", chordLink:"https://drive.google.com/file/d/13ZCEc8k4bmnWrEh6ENPyTH9QziE2hl6d/view", category:"musica"},
+  {title:"Tributo a Yehovah", artist:"PC Baruk", tom:"E", chordLink:"https://drive.google.com/file/d/1njmBgjt-gt9WbAyTllTyQ7JsJ1fhuEsP/view", category:"musica"},
+  {title:"A Ele A Glória", artist:"Gabriela Rocha", tom:"F#", chordLink:"https://drive.google.com/file/d/1vbqsHfprN029ecFTihq9pbfU8R-UnZVv/view", category:"musica"},
+  {title:"Meu Alvo", artist:"Kleber Lucas", tom:"Bb", chordLink:"https://drive.google.com/file/d/1y3pYYyetaJWzqL3E6tyMh-UNErtI2OJX/view", category:"musica"},
+  {title:"Ser Reconhecido de Deus", artist:"Renascer Praise", tom:"A", chordLink:"https://drive.google.com/file/d/1Hn5MySLK5r22DE4xSWIxzKsAmy4IbsCm/view", category:"musica"},
+  {title:"Até que Ele venha", artist:"CAPO", tom:"D", chordLink:"https://drive.google.com/file/d/1POV8oOgMTNGvCwdXH99vYKAyaYwW0NoX/view", category:"musica"},
+  {title:"Quebrantado", artist:"Vineyard", tom:"C", chordLink:"https://drive.google.com/file/d/1NYx9k7TFMxF9feEPu8feEJ720pZNExoE/view", category:"musica"},
+  {title:"Tudo É Diferente", artist:"Aline Barros", tom:"D", chordLink:"https://drive.google.com/file/d/1nQfpv9uDyc4UFsF7uhCO-6u2njHAeU-C/view", category:"musica"},
+  {title:"Ao Único", artist:"Aline Barros", tom:"C", chordLink:"https://drive.google.com/file/d/1JlhsaSVyCzda8aI9IKJx_QIea2d9ykqj/view", category:"musica"},
+  {title:"Eu vejo a Glória", artist:"Fernanda Brum", tom:"G", chordLink:"https://drive.google.com/file/d/1g6GHientpMPNDUmrio97N8WvwQto8XTF/view", category:"musica"},
+  {title:"O nosso general é cristo", artist:"", tom:"F", chordLink:"https://drive.google.com/file/d/1WC2UblbBgjBoPy91d84_IL1OLlUIF4oh/view", category:"musica"},
+  {title:"Faz chover", artist:"", tom:"D", chordLink:"https://drive.google.com/file/d/1itqscgb9iWRSIc9K2BZItrIzk92ViUmH/view", category:"musica"},
+  {title:"Estamos de pé", artist:"Marcus Salles", tom:"B", chordLink:"https://drive.google.com/file/d/1MbrJ0pM58aXmqV4-cUd4-lMg0h89_p_P/view", category:"musica"},
+  {title:"Bondade de Deus", artist:"Get Church", tom:"G", chordLink:"https://drive.google.com/file/d/174xtVsdDA40Gh9yNqSJyY_Uw2sX7qCMY/view", category:"musica"},
+  {title:"Todavia me alegrarei", artist:"Leandro Soares", tom:"G", chordLink:"https://drive.google.com/file/d/1Y1ikZe8381fG1nUluVzjD42Elu0nsq5u/view", category:"musica"},
+  {title:"Casa do Pai", artist:"Aline Barros", tom:"G", chordLink:"https://drive.google.com/file/d/1trn-xOtJWsgUKi41WAOOhe2mwo4U0nU2/view", category:"musica"},
+  {title:"Poder da Oração", artist:"Alda Célia", tom:"D", chordLink:"https://drive.google.com/file/d/1RZv7TSeTtKjPDNbdrylUGo_SsO80RpPm/view", category:"musica"},
+  {title:"Pula-Pula", artist:"Aline Barros", tom:"G", chordLink:"https://drive.google.com/file/d/1tVVGoiZk9cUBtHZ6quzP7QpMt65tg9Ve/view", category:"musica"},
+  {title:"Ousado Amor", artist:"Nívea Soares", tom:"Gm", chordLink:"https://drive.google.com/file/d/1B0w4hjG-SKkG86awqF3vFJu-1A-SGQMV/view", category:"musica"},
+  {title:"Porque Ele vive", artist:"", tom:"E", chordLink:"https://drive.google.com/file/d/1_IriOdrYXmZKX3le6QyELLEVrJunrWz3/view", category:"musica"},
+  {title:"Galileu", artist:"Fernandinho", tom:"C#", chordLink:"https://drive.google.com/file/d/1Yqa5aju6RuZjCIyO1Oqhojr_SiXbpjCs/view", category:"musica"},
+  {title:"Bendito Serei", artist:"", tom:"F", chordLink:"https://drive.google.com/file/d/1-pTxJmNgeyMAH1lMZ8ukA0zwY39TgLv0/view", category:"musica"},
+  {title:"Sobre as águas", artist:"", tom:"D", chordLink:"https://drive.google.com/file/d/1CDcviDz9x-OgoODtoRWtUhjP9zpRLHWl/view", category:"musica"},
+  {title:"Videira", artist:"Claudio Claro", tom:"G", chordLink:"https://drive.google.com/file/d/1Qvv5xy-5I2UXRNQ3SPSy3LDKTfE9to29/view", category:"musica"},
+  {title:"Vem, Esta é a Hora", artist:"Vineyard", tom:"D", chordLink:"https://drive.google.com/file/d/1wRHmy_gqmzI5PvJ8Du9t_luA8j0HYD9N/view", category:"musica"},
+  {title:"Canção do Céu", artist:"Anderson Freire", tom:"D", chordLink:"https://drive.google.com/file/d/1SKryoOB35CnMlSDJrVUL6FAvO5UbsJ6R/view", category:"musica"},
+  {title:"Deus da minha Vida", artist:"Thalles Roberto", tom:"F", chordLink:"https://drive.google.com/file/d/1E1jYRDrSRQg8BOa0s_aZKWEbTu0hXG7G/view", category:"musica"},
+  {title:"Basta Uma Palavra do Meu Deus", artist:"Comunidade I. da Zona Sul", tom:"G", chordLink:"https://drive.google.com/file/d/1ODFbTWf8a10JtRTwTm-ragjwMKos56rM/view", category:"musica"},
+  {title:"Tudo é teu", artist:"Hillsong", tom:"B", chordLink:"https://drive.google.com/file/d/1PhWBtP2e_eeSSxQhbVyhKsyomXX4iUyQ/view", category:"musica"},
+  {title:"Os Sonhos de Deus", artist:"Preto no Branco", tom:"A", chordLink:"https://drive.google.com/file/d/1pXcnU4r1xohuK90JvUVMNw8UyB0jZcl_/view", category:"musica"},
+  {title:"Algo novo", artist:"Coral Kemuel", tom:"D", chordLink:"https://drive.google.com/file/d/1CNRxPpDaDR8DOSp0o-zH9qBlt3eeI_TS/view", category:"musica"},
+];
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+async function loadKey(key, fallback){
+  try{
+    const res = await window.storage.get(key, true);
+    return res ? JSON.parse(res.value) : fallback;
+  }catch(e){ return fallback; }
+}
+async function saveKey(key, value){
+  try{
+    const res = await window.storage.set(key, JSON.stringify(value), true);
+    if(!res) showToast('Não foi possível salvar agora. Tente de novo.');
+    return res;
+  }catch(e){ showToast('Não foi possível salvar agora. Tente de novo.'); return null; }
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 2400);
+}
+
+function fmtDateLong(dateStr){
+  if(!dateStr) return '';
+  const d = new Date(dateStr+'T12:00:00');
+  return d.toLocaleDateString('pt-BR', {weekday:'long', day:'numeric', month:'long'});
+}
+function fmtDateShort(dateStr){
+  if(!dateStr) return '';
+  const d = new Date(dateStr+'T12:00:00');
+  return d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'});
+}
+function nextSundayISO(){
+  const d = new Date();
+  const diff = (7 - d.getDay()) % 7;
+  d.setDate(d.getDate() + (diff===0?0:diff));
+  return d.toISOString().slice(0,10);
+}
+function initials(name){
+  return (name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]?.toUpperCase()||'').join('');
+}
+function youtubeSearchUrl(title, artist){
+  const q = [title, artist, 'cifra'].filter(Boolean).join(' ');
+  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
+}
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ---------------- TABS / NAV ---------------- */
+function renderTabs(){
+  const wrap = document.getElementById('tabs');
+  wrap.innerHTML = TABS.map(t=>`
+    <button class="tab" data-tab="${t.id}" onclick="switchTab('${t.id}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">${t.icon}</svg>
+      ${t.label}
+    </button>`).join('');
+}
+function switchTab(id){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-'+id));
+}
+
+/* ---------------- ADMIN UI ---------------- */
+function renderAdminUI(){
+  const pillWrap = document.getElementById('adminPillWrap');
+  const bannerWrap = document.getElementById('adminBannerWrap');
+  if(state.isAdmin){
+    pillWrap.innerHTML = `<div class="admin-pill on">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M20 6L9 17l-5-5"/></svg>
+      Modo líder <button onclick="doLogout()">saír</button>
+    </div>`;
+    bannerWrap.innerHTML = `<div class="admin-banner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      Modo líder ativo — você pode editar o catálogo, o mural e a agenda.
+    </div>`;
+  } else {
+    pillWrap.innerHTML = `<div class="admin-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> Visitante</div>`;
+    bannerWrap.innerHTML = '';
+  }
+  document.getElementById('btnAddSong').style.display = state.isAdmin ? 'inline-flex':'none';
+  document.getElementById('btnManageTags').style.display = state.isAdmin ? 'inline-flex':'none';
+  document.getElementById('btnEditMural').style.display = state.isAdmin ? 'inline-flex':'none';
+  document.getElementById('btnAddEvent').style.display = state.isAdmin ? 'inline-flex':'none';
+  renderImportBar();
+}
+
+const DRIVE_IMPORT_BATCH_2 = [
+  {title:"Eu amo a tua casa", artist:"Com. Evangélica Internacional da Zona Sul", tom:"B", chordLink:"https://drive.google.com/file/d/1VUjkkjQZttpujarYgPhdSD9FjprEhvGu/view", category:"musica"},
+  {title:"Celebrai a Cristo", artist:"", tom:"G", chordLink:"https://drive.google.com/file/d/1tFsHgMpQT8EC2nAZkAMfz8vWy_4wQZE8/view", category:"musica"},
+  {title:"Oceanos", artist:"Hillsong", tom:"D", chordLink:"https://drive.google.com/file/d/100ptVtM99UPhjpuRizraX9RuZOhIBbxv/view", category:"musica"},
+  {title:"Milagre", artist:"André Valadão", tom:"C", chordLink:"https://drive.google.com/file/d/1MTHEwv2Yc9v3nGZLxWWIL_GzLsIDzk1e/view", category:"musica"},
+  {title:"Tu és bom", artist:"PIBU", tom:"E", chordLink:"https://drive.google.com/file/d/10sySWdAGCznMn6fnvxdW-3xBNxUjkLeM/view", category:"musica"},
+  {title:"Se não for pra te adorar", artist:"Fernandinho", tom:"D", chordLink:"https://drive.google.com/file/d/1NoPjY76moaFd_fBtbjK3V_-w9Au9q3e-/view", category:"musica"},
+  {title:"Rei Meu", artist:"Aline Barros", tom:"A", chordLink:"https://drive.google.com/file/d/1sx-cnSm0QiU_kSUUWWq5RM48ZyzfA8mf/view", category:"musica"},
+  {title:"Jeová Jireh", artist:"Aline Barros", tom:"G", chordLink:"https://drive.google.com/file/d/1gf2bimXikPSj7nrW3dDdN3x9-Eq-LTBy/view", category:"musica"},
+  {title:"Deserto", artist:"Arianne", tom:"B", chordLink:"https://drive.google.com/file/d/1UYz8zw_quD1umqIqo5tdRxbGFDnAfc01/view", category:"musica"},
+  {title:"Mil graus", artist:"Renascer Praise", tom:"C", chordLink:"https://drive.google.com/file/d/1tI1EKGiA8BdsBivHr4AHF_nYzGDcCvSa/view", category:"musica"},
+  {title:"Um novo começo", artist:"Ludmila Ferber", tom:"A", chordLink:"https://drive.google.com/file/d/1f7mdVcjP2rjrY3tgxMdy9GJhyYQYT7C0/view", category:"musica"},
+  {title:"Uma Nova História", artist:"", tom:"", chordLink:"https://drive.google.com/file/d/1LZ278YLHqXsjxMeVC8gIEeB5Vfrj34it/view", category:"musica"},
+  {title:"Confiarei", artist:"Com. Evangélica Internacional da Zona Sul", tom:"Bm", chordLink:"https://drive.google.com/file/d/174AjZXCdfv9DgijUWQ8UEa6LX5YH4q2F/view", category:"musica"},
+  {title:"Eu Sou Teu Pai", artist:"Valesca Mayssa", tom:"B", chordLink:"https://drive.google.com/file/d/1zmP5YCEc3Qx6y1evmDd_9PV2xa7BMyyO/view", category:"musica"},
+  {title:"Jeová é o teu Cavaleiro", artist:"Kleber Lucas", tom:"G", chordLink:"https://drive.google.com/file/d/12AKSrTw_i188tW5slYEnUZ15rO9-wD7C/view", category:"musica"},
+  {title:"Solta o cabo da nau", artist:"Harpa Cristã", tom:"G", chordLink:"https://drive.google.com/file/d/1MX5zBCW7vZVzOd4OXUiDUOy39w8hq46l/view", category:"musica"},
+  {title:"Sonho de Cristo", artist:"Aline Barros", tom:"D", chordLink:"https://drive.google.com/file/d/1L_foVm-627jn-wHwTwLQsXzoGbR0HaqJ/view", category:"musica"},
+  {title:"Desperta", artist:"Gabriela Rocha", tom:"G", chordLink:"https://drive.google.com/file/d/1UYvj_dJhKWVRN_w7gIDbRKmaEMDGw_0z/view", category:"musica"},
+  {title:"Deus de Promessas", artist:"", tom:"", chordLink:"https://drive.google.com/file/d/123xIqaHosSVoU1z2UEU2q4UNxqoQU164/view", category:"musica"},
+  {title:"Vitória No Deserto", artist:"", tom:"G", chordLink:"https://drive.google.com/file/d/1IWqhAod4zO0fs75yb3OH5OmFjp2TpRgg/view", category:"musica"},
+  {title:"Vitorioso És", artist:"Gabriel Guedes", tom:"F", chordLink:"https://drive.google.com/file/d/1fBPwtan4u-7oHThuq6nMPiGnw7OwS-3m/view", category:"musica"},
+  {title:"O Mover do Espírito", artist:"Armando Filho", tom:"A", chordLink:"https://drive.google.com/file/d/1hRK9WWssSoblhTfhYEnPCx8UBGmwbyGL/view", category:"musica"},
+  {title:"Rio De Vida", artist:"Kleber Lucas", tom:"C", chordLink:"https://drive.google.com/file/d/1f7mfjGmy6dhL3YbPI2_I3RdbgvV1ggf9/view", category:"musica"},
+  {title:"O Grande Eu Sou", artist:"Nazareno Central Music", tom:"D", chordLink:"https://drive.google.com/file/d/1603Km2xux1ZEIBJVMLtXRnzlsk_EMZGY/view", category:"musica"},
+  {title:"É tudo sobre você", artist:"Morada", tom:"Am", chordLink:"https://drive.google.com/file/d/1zCUci5EdAh6nJd72JZQcpkXsaALFuhnr/view", category:"musica"},
+  {title:"Ele é Exaltado", artist:"Adhemar de Campos", tom:"F", chordLink:"https://drive.google.com/file/d/1EBlu7qzKHidJwMU_QHgVFfFhW5ix6ovo/view", category:"musica"},
+  {title:"A alegria do Senhor", artist:"Fernandinho", tom:"Gm", chordLink:"https://drive.google.com/file/d/1kGvGFhmk9iQ46UgbDoH0lobYmnGFi076/view", category:"musica"},
+  {title:"Ele não desiste de você", artist:"Marquinhos Gomes", tom:"C", chordLink:"https://drive.google.com/file/d/1zJUf89ZkVUhPfqYJ32OF0UUYNTDPHGUT/view", category:"musica"},
+  {title:"Vim Falar com Deus", artist:"Delino Marçal", tom:"E", chordLink:"https://drive.google.com/file/d/1LiVBMszOf6apsSz5yWN8eElfp80iXU1b/view", category:"musica"},
+];
+
+const DRIVE_IMPORT_BATCH_3_HINOS = [
+  {title:"403 - Alegre", artist:"", tom:"D", category:"hino", chordLink:"https://drive.google.com/file/d/1EQnPdMrxq-tkzQmi-SovckeWSgXvlua5/view"},
+  {title:"301 - Crer e Observar", artist:"", tom:"A", category:"hino", chordLink:"https://drive.google.com/file/d/195_KbAJonMLqiNcHL4GZ04YNPd0oFuaT/view"},
+  {title:"324 - Refúgio Verdadeiro", artist:"", tom:"D", category:"hino", chordLink:"https://drive.google.com/file/d/1-YM_Fzsh8U-J6xtUnNQju1QA5ZTUf5YI/view"},
+  {title:"329 - Conta as Bênçãos", artist:"", tom:"D", category:"hino", chordLink:"https://drive.google.com/file/d/1ZBoDHILQEDQ2jDs0V5rfuOXiRoT7CjLN/view"},
+  {title:"410cc - Felicidade no Serviço", artist:"", tom:"G", category:"hino", chordLink:"https://drive.google.com/file/d/1bi7byOxunCYTuGTpn7XWOEtMwi7oz-hG/view"},
+  {title:"367 - Firme Na Rocha", artist:"", tom:"D", category:"hino", chordLink:"https://drive.google.com/file/d/1bDzqZCUGPoR18PW3NverFKn6ApxeYKZf/view"},
+  {title:"25 HCC - Tu és fiel", artist:"", tom:"D", category:"hino", chordLink:"https://drive.google.com/file/d/1ojn_cV8Ts6-JgeGiBSWlIoYd41nxmiII/view"},
+  {title:"160 - A Fé Contemplada", artist:"", tom:"A", category:"hino", chordLink:"https://drive.google.com/file/d/1HH1wSeuzXrYjjlbKcdez2m7wi8Ay_RR-/view"},
+  {title:"385 - Louvor", artist:"", tom:"G", category:"hino", chordLink:"https://drive.google.com/file/d/1f9prIZRmpVrj9K8ACY5U-pLGLpyUWAa8/view"},
+  {title:"295CC - Tudo entregarei", artist:"", tom:"C", category:"hino", chordLink:"https://drive.google.com/file/d/1XYAYFtzBwxJ7IXHt7YbEGgihK6i2IXWc/view"},
+  {title:"Olhando Para Cristo (579)", artist:"Cantor Cristão", tom:"G", category:"hino", chordLink:"https://drive.google.com/file/d/1LVLJcuXkeEkguIbZNk5yyK33n3XEcTP_/view"},
+  {title:"193HCC - Maravilhosa graça", artist:"", tom:"C", category:"hino", chordLink:"https://drive.google.com/file/d/1sLmahrVP9Q87orGItg8VKL-Lfnv9DWlM/view"},
+  {title:"274 CC - Coro Santo", artist:"", tom:"G", category:"hino", chordLink:"https://drive.google.com/file/d/1tHuplUuWIAtyGiS-A8BVpUDk09zYSOQ2/view"},
+  {title:"112 - Vencendo Vem Jesus", artist:"Cantor Cristão", tom:"G", category:"hino", chordLink:"https://drive.google.com/file/d/15BcY6gUZSAAWLZSgrcZvsvFJ_bQ0j5_j/view"},
+  {title:"108 - Chamada Final", artist:"", tom:"D", category:"hino", chordLink:"https://drive.google.com/file/d/1AYoW0fUsK1y23LlqeHUBcV_C9hvg1AgN/view"},
+  {title:"7CC - Maravilhas Divinas", artist:"", tom:"C", category:"hino", chordLink:"https://drive.google.com/file/d/1uqt63SU9lj54oh2t7XcWJT9vwElDvhPs/view"},
+  {title:"66 hcc - Cantarei ao meu Salvador", artist:"", tom:"C", category:"hino", chordLink:"https://drive.google.com/file/d/1zeXTnW2487OhjOQcNqHsBu7Q_0XBNrjf/view"},
+  {title:"009cc - Santo", artist:"", tom:"A", category:"hino", chordLink:"https://drive.google.com/file/d/1lq4lBw69UtlBvEttmQYzrAAEl3dd4WjS/view"},
+  {title:"27 - Natal", artist:"", tom:"D", category:"hino", chordLink:"https://drive.google.com/file/d/1m4x3KjtdhufNRb4LbS-6KIDizLAfwrgi/view"},
+  {title:"73 - Um Grande Amigo", artist:"Cantor Cristão", tom:"D", category:"hino", chordLink:"https://drive.google.com/file/d/1MrYj5w9wHo8nrBzEru_7O7eOgV2Oz0nR/view"},
+  {title:"314 - Estou Seguro", artist:"", tom:"A", category:"hino", chordLink:"https://drive.google.com/file/d/1e_5my7OCEevMaeoepi3P4k0PtNQMyxqP/view"},
+  {title:"015 - Exultação", artist:"", tom:"G", category:"hino", chordLink:"https://drive.google.com/file/d/11gGEIiBEW7qG4CT_cEgtTjFakNdpEQFI/view"},
+  {title:"411 - Dia Festivo", artist:"", tom:"G", category:"hino", chordLink:"https://drive.google.com/file/d/1aP_37lZhPMRVywWIFXYgNgOjRRcOFJT0/view"},
+  {title:"366 - Firmeza", artist:"", tom:"C", category:"hino", chordLink:"https://drive.google.com/file/d/1R3ImVcl-ZQ6sYhUMrQ5YSmk-J78t3I9e/view"},
+  {title:"398cc - Sou feliz", artist:"", tom:"A", category:"hino", chordLink:"https://drive.google.com/file/d/1J-6FLMPSSZTsDxddPxsu0j11prPVD6Bm/view"},
+  {title:"089 CC - O Poder do Sangue", artist:"", tom:"A", category:"hino", chordLink:"https://drive.google.com/file/d/1qW3B4DTlQs8YdRd8B0tbpIYA0TbqKJBt/view"},
+  {title:"395 - Cristo Satisfaz", artist:"", tom:"C", category:"hino", chordLink:"https://drive.google.com/file/d/1u2NkG7ah2ELA8BAuI6VUs60CgIBtdIr_/view"},
+  {title:"380 CC - Amor", artist:"", tom:"A", category:"hino", chordLink:"https://drive.google.com/file/d/1YBQgjMePvzb9RhIzBSfynp3JsITq6zj9/view"},
+  {title:"417 HCC - Brilha no Viver", artist:"", tom:"D", category:"hino", chordLink:"https://drive.google.com/file/d/17lEr-N_F58pz2dstRpx19nJcgVf8DUKR/view"},
+  {title:"381 - Amor Fraternal", artist:"", tom:"A", category:"hino", chordLink:"https://drive.google.com/file/d/1Kiq9MJEovLS9ix7VvZDztD21eM2wf2oD/view"},
+  {title:"375 - Segurança", artist:"", tom:"A", category:"hino", chordLink:"https://drive.google.com/file/d/1L6XMqrzdwPNUPQCuhDRrzUAo16FnMEBB/view"},
+  {title:"154 - Firme nas Promessas", artist:"", tom:"G", category:"hino", chordLink:"https://drive.google.com/file/d/1Bn_zt6K5nPqo8PQQO9mF_EXfsJEVpIS8/view"},
+  {title:"104 HCC - Surgem Anjos Proclamando", artist:"", tom:"E", category:"hino", chordLink:"https://drive.google.com/file/d/1eNlEElkP0Ng_T7D0DriT7udvzyIZ8pjx/view"},
+  {title:"26CC - Rei Excelso", artist:"", tom:"C", category:"hino", chordLink:"https://drive.google.com/file/d/1fDhIYN7Axu3uTPU6eCyozzeRYlakpS8e/view"},
+  {title:"123 CC - Bendito Cordeiro", artist:"Cantor Cristão", tom:"D", category:"hino", chordLink:"https://drive.google.com/file/d/1G5ff8Z4s9sAoDvwwi99i7oz0-gkKUTJG/view"},
+  {title:"25cc - Amor (Que grande amor)", artist:"", tom:"C", category:"hino", chordLink:"https://drive.google.com/file/d/1rBhOkz_tzmouFE6hqjkUuujJef1-nXEH/view"},
+  {title:"368 - Confiança", artist:"", tom:"D", category:"hino", chordLink:"https://drive.google.com/file/d/1aUox4k40MFqD_-cO2lwCTX8KbB0PSEVs/view"},
+];
+
+function songKey(s){ return (s.title+'|'+(s.artist||'')).toLowerCase().trim(); }
+function pendingImportBatch(){
+  const existing = new Set(state.songs.map(songKey));
+  const all = DRIVE_IMPORT_BATCH_1.concat(DRIVE_IMPORT_BATCH_2).concat(DRIVE_IMPORT_BATCH_3_HINOS);
+  return all.filter(s => !existing.has(songKey(s)));
+}
+function renderImportBar(){
+  const wrap = document.getElementById('importBar');
+  if(!state.isAdmin){ wrap.style.display='none'; return; }
+  const pending = pendingImportBatch();
+  if(pending.length === 0){ wrap.style.display='none'; return; }
+  const nMusicas = pending.filter(s=>(s.category||'musica')==='musica').length;
+  const nHinos = pending.filter(s=>s.category==='hino').length;
+  const parts = [];
+  if(nMusicas) parts.push(`${nMusicas} música${nMusicas>1?'s':''}`);
+  if(nHinos) parts.push(`${nHinos} hino${nHinos>1?'s':''}`);
+  wrap.style.display='block';
+  wrap.innerHTML = `<div class="admin-banner" style="background:var(--paper-raised); color:var(--ink); border:1.5px dashed var(--ink); margin-bottom:16px;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+    <span style="flex:1;">${parts.join(' e ')} importados do Drive, prontos pra entrar no catálogo.</span>
+    <button class="btn btn-sm btn-dark" onclick="importDriveBatch()">Importar agora</button>
+  </div>`;
+}
+async function importDriveBatch(){
+  const pending = pendingImportBatch();
+  if(pending.length === 0) return;
+  pending.forEach(s => state.songs.push({id:uid(), title:s.title, artist:s.artist||'', tom:s.tom||'', tags:[], chordLink:s.chordLink||'', category:s.category||'musica'}));
+  await saveKey('songs__v1', state.songs);
+  renderCatalog();
+  renderImportBar();
+  showToast(`${pending.length} item(ns) importado(s) com sucesso.`);
+}
+
+function doLogin(){
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value.trim();
+  if(u === 'lider' && p === '1234'){
+    state.isAdmin = true;
+    document.getElementById('loginError').style.display='none';
+    renderAdminUI(); renderCatalog(); renderMural(); renderAgenda();
+    showToast('Bem-vindo(a) ao modo líder.');
+    switchTab('catalogo');
+  } else {
+    document.getElementById('loginError').style.display='block';
+  }
+}
+function doLogout(){
+  state.isAdmin = false;
+  renderAdminUI(); renderCatalog(); renderMural(); renderAgenda();
+  showToast('Você saiu do modo líder.');
+}
+
+/* ---------------- MODAL HELPERS ---------------- */
+function openModal(html){
+  document.getElementById('modalContent').innerHTML = html;
+  document.getElementById('overlay').classList.add('show');
+}
+function closeModal(){
+  document.getElementById('overlay').classList.remove('show');
+}
+document.getElementById('overlay').addEventListener('click', e=>{
+  if(e.target.id==='overlay') closeModal();
+});
+
+/* ================= CATÁLOGO ================= */
+function switchCategory(cat){
+  state.catFilter = cat;
+  document.querySelectorAll('.cat-toggle-btn').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
+  renderCatalog();
+}
+
+function renderTomFilterOptions(songsInCategory){
+  const sel = document.getElementById('filterTom');
+  const currentVal = sel.value;
+  const toms = [...new Set(songsInCategory.map(s=>s.tom).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todos os tons</option>' + toms.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  if(toms.includes(currentVal)) sel.value = currentVal;
+}
+
+function tagDef(id){ return state.tagDefs.find(t=>t.id===id); }
+
+function renderCatalog(){
+  const byCategory = state.songs.filter(s=>(s.category||'musica') === state.catFilter);
+  renderTomFilterOptions(byCategory);
+  const q = (document.getElementById('searchInput').value||'').toLowerCase();
+  const tomFilter = document.getElementById('filterTom').value;
+  const filtered = byCategory.filter(s=>{
+    const matchQ = !q || s.title.toLowerCase().includes(q) || (s.artist||'').toLowerCase().includes(q);
+    const matchTom = !tomFilter || s.tom === tomFilter;
+    return matchQ && matchTom;
+  }).sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'));
+
+  const catLabel = state.catFilter === 'hino' ? 'hino' : 'música';
+  document.getElementById('catalogCount').textContent = byCategory.length
+    ? `${byCategory.length} ${catLabel}${byCategory.length>1?'s':''} no catálogo`
+    : '';
+
+  const list = document.getElementById('songList');
+  if(byCategory.length === 0){
+    list.innerHTML = emptyState(
+      '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+      state.catFilter === 'hino' ? 'Nenhum hino cadastrado' : 'O catálogo está vazio',
+      state.isAdmin ? 'Clique em "Nova música" para começar a adicionar o repertório.' : 'Peça para um líder de louvor adicionar o repertório.'
+    );
+    return;
+  }
+  if(filtered.length === 0){
+    list.innerHTML = emptyState('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>', 'Nada encontrado', 'Tente outra busca ou limpe o filtro de tom.');
+    return;
+  }
+
+  list.innerHTML = filtered.map(s=>`
+    <div class="song-card">
+      <div class="tom-badge">${escapeHtml(s.tom || '—')}</div>
+      <div class="song-main">
+        <p class="song-title">${escapeHtml(s.title)}</p>
+        ${s.artist ? `<p class="song-artist">${escapeHtml(s.artist)}</p>`:''}
+        ${s.tags && s.tags.length ? `<div class="song-tags">${s.tags.map(id=>{const td=tagDef(id); return td ? `<span class="tag" style="border-color:${td.color}; color:${td.color};">${escapeHtml(td.name)}</span>` : '';}).join('')}</div>`:''}
+      </div>
+      <div class="song-actions">
+        ${s.chordLink
+          ? `<a class="cifra-link" href="${escapeHtml(s.chordLink)}" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h7v7M21 3 10 14"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+              Cifra
+            </a>`
+          : `<span class="cifra-none">sem cifra</span>`}
+        <a class="cifra-link" href="${youtubeSearchUrl(s.title, s.artist)}" target="_blank" rel="noopener" title="Buscar no YouTube">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="3"/><path d="m10 9 5 3-5 3z"/></svg>
+          YouTube
+        </a>
+        <button class="cifra-link" onclick="openVozesModal('${s.id}')" title="Vozes">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+          Vozes${(state.voices[s.id]||[]).length ? ` (${(state.voices[s.id]||[]).length})` : ''}
+        </button>
+        ${state.isAdmin ? `
+          <button class="icon-btn" onclick="openSongModal('${s.id}')" aria-label="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+          <button class="icon-btn" onclick="deleteSong('${s.id}')" aria-label="Excluir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg></button>
+        ` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function emptyState(iconPath, title, msg){
+  return `<div class="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">${iconPath}</svg>
+    <p class="empty-title">${title}</p>
+    <p>${msg}</p>
+  </div>`;
+}
+
+function openSongModal(id){
+  const song = id ? state.songs.find(s=>s.id===id) : null;
+  const cat = song?.category || state.catFilter || 'musica';
+  const selectedTags = new Set(song?.tags||[]);
+  openModal(`
+    <div class="modal-head">
+      <h3>${song ? 'Editar' : 'Nova entrada'}</h3>
+      <button class="icon-btn" onclick="closeModal()" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="field">
+      <label>Tipo</label>
+      <div style="display:flex; gap:16px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13.5px;"><input type="radio" name="f_cat" value="musica" ${cat==='musica'?'checked':''}> Música</label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13.5px;"><input type="radio" name="f_cat" value="hino" ${cat==='hino'?'checked':''}> Hino</label>
+      </div>
+    </div>
+    <div class="field"><label>Título *</label><input class="input" id="f_title" value="${escapeHtml(song?.title||'')}" placeholder="Ex: Grande é o Senhor"></div>
+    <div class="field-row">
+      <div class="field"><label>Artista / compositor</label><input class="input" id="f_artist" value="${escapeHtml(song?.artist||'')}" placeholder="Ex: Diante do Trono"></div>
+      <div class="field" style="max-width:120px;"><label>Tom</label><input class="input mono" id="f_tom" value="${escapeHtml(song?.tom||'')}" placeholder="Ex: G"></div>
+    </div>
+    <div class="field">
+      <label>Tags</label>
+      <div id="f_tagsWrap">${renderTagCheckboxes(selectedTags)}</div>
+      <p class="hint">Não achou a tag? <button type="button" onclick="closeModal(); openTagManager();" style="background:none;border:none;color:var(--ink);text-decoration:underline;font:inherit;padding:0;cursor:pointer;">Gerencie as tags aqui</button> e depois volte pra editar.</p>
+    </div>
+    <div class="field"><label>Link da cifra (PDF, imagem ou Drive)</label><input class="input" id="f_link" value="${escapeHtml(song?.chordLink||'')}" placeholder="https://..."></div>
+    <p class="error-msg" id="songError" style="display:none;">Dê um título para a música.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-dark" onclick="saveSong(${song ? `'${song.id}'` : 'null'})">Salvar</button>
+    </div>
+  `);
+}
+
+function renderTagCheckboxes(selectedTags){
+  if(state.tagDefs.length === 0){
+    return `<p class="hint">Nenhuma tag cadastrada ainda. Use "Gerencie as tags" pra criar a primeira.</p>`;
+  }
+  return state.tagDefs.map(t=>`
+    <label class="tag-check">
+      <input type="checkbox" value="${t.id}" ${selectedTags.has(t.id)?'checked':''}>
+      <span class="dot" style="background:${t.color};"></span>
+      ${escapeHtml(t.name)}
+    </label>
+  `).join('');
+}
+
+async function saveSong(id){
+  const title = document.getElementById('f_title').value.trim();
+  if(!title){ document.getElementById('songError').style.display='block'; return; }
+  const category = document.querySelector('input[name="f_cat"]:checked')?.value || 'musica';
+  const artist = document.getElementById('f_artist').value.trim();
+  const tom = document.getElementById('f_tom').value.trim();
+  const tags = [...document.querySelectorAll('#f_tagsWrap input[type="checkbox"]:checked')].map(i=>i.value);
+  const chordLink = document.getElementById('f_link').value.trim();
+
+  if(id){
+    const s = state.songs.find(s=>s.id===id);
+    Object.assign(s, {title, artist, tom, tags, chordLink, category});
+  } else {
+    state.songs.push({id:uid(), title, artist, tom, tags, chordLink, category});
+  }
+  await saveKey('songs__v1', state.songs);
+  closeModal();
+  state.catFilter = category;
+  document.querySelectorAll('.cat-toggle-btn').forEach(b=>b.classList.toggle('active', b.dataset.cat===category));
+  renderCatalog();
+  showToast('Música salva.');
+}
+
+/* ================= GERENCIADOR DE TAGS ================= */
+function openTagManager(){
+  window._newTagColor = TAG_COLORS[0];
+  openModal(`
+    <div class="modal-head">
+      <h3>Gerenciar tags</h3>
+      <button class="icon-btn" onclick="closeModal()" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div id="tagListWrap"></div>
+    <div class="field" style="margin-top:14px;">
+      <label>Nova tag</label>
+      <div style="display:flex; gap:8px;">
+        <input class="input" id="newTagName" placeholder="Ex: Adoração" style="flex:1;">
+        <button class="btn btn-sm btn-dark" onclick="addTagDef()">Adicionar</button>
+      </div>
+      <div class="color-swatches" id="newTagColors"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-dark" style="flex:1;" onclick="closeModal()">Concluído</button>
+    </div>
+  `);
+  renderTagManagerList();
+  renderColorSwatches();
+}
+function renderColorSwatches(){
+  document.getElementById('newTagColors').innerHTML = TAG_COLORS.map(c=>
+    `<button type="button" class="color-swatch ${c===window._newTagColor?'selected':''}" style="background:${c};" onclick="pickNewTagColor('${c}')"></button>`
+  ).join('');
+}
+function pickNewTagColor(c){
+  window._newTagColor = c;
+  renderColorSwatches();
+}
+function renderTagManagerList(){
+  const wrap = document.getElementById('tagListWrap');
+  if(state.tagDefs.length === 0){
+    wrap.innerHTML = `<p class="hint">Nenhuma tag cadastrada ainda.</p>`;
+    return;
+  }
+  wrap.innerHTML = state.tagDefs.map(t=>`
+    <div class="tag-row">
+      <span class="dot" style="background:${t.color};"></span>
+      <span style="flex:1; font-size:13.5px;">${escapeHtml(t.name)}</span>
+      <button class="icon-btn" onclick="deleteTagDef('${t.id}')" aria-label="Remover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+  `).join('');
+}
+async function addTagDef(){
+  const input = document.getElementById('newTagName');
+  const name = input.value.trim();
+  if(!name) return;
+  state.tagDefs.push({id:uid(), name, color: window._newTagColor || TAG_COLORS[0]});
+  await saveKey('tagDefs__v1', state.tagDefs);
+  input.value = '';
+  renderTagManagerList();
+}
+async function deleteTagDef(id){
+  if(!confirm('Remover esta tag? Ela será retirada de todas as músicas que a usam.')) return;
+  state.tagDefs = state.tagDefs.filter(t=>t.id!==id);
+  state.songs.forEach(s=>{ if(s.tags) s.tags = s.tags.filter(tid=>tid!==id); });
+  await saveKey('tagDefs__v1', state.tagDefs);
+  await saveKey('songs__v1', state.songs);
+  renderTagManagerList();
+  renderCatalog();
+}
+
+async function deleteSong(id){
+  if(!confirm('Remover esta música do catálogo?')) return;
+  state.songs = state.songs.filter(s=>s.id!==id);
+  await saveKey('songs__v1', state.songs);
+  renderCatalog();
+  showToast('Música removida.');
+}
+
+document.getElementById('searchInput').addEventListener('input', renderCatalog);
+document.getElementById('filterTom').addEventListener('change', renderCatalog);
+
+/* ================= MURAL ================= */
+function renderMural(){
+  const wrap = document.getElementById('muralWrap');
+  if(!state.mural.date || !state.mural.items || state.mural.items.length===0){
+    wrap.innerHTML = emptyState(
+      '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/>',
+      'O mural ainda não foi montado',
+      state.isAdmin ? 'Clique em "Editar mural" para escolher as músicas do próximo culto.' : 'Em breve o líder de louvor vai escolher as músicas do próximo domingo.'
+    );
+    return;
+  }
+  const items = [...state.mural.items].sort((a,b)=>a.order-b.order);
+  wrap.innerHTML = `
+    <div class="setlist-card">
+      <div class="setlist-header">
+        <p class="eyebrow">Repertório de</p>
+        <h3>${fmtDateLong(state.mural.date)}</h3>
+      </div>
+      <div class="setlist-divider"></div>
+      <div class="setlist-body">
+        ${items.map((it,i)=>{
+          const song = state.songs.find(s=>s.id===it.songId);
+          if(!song) return '';
+          return `<div class="setlist-item">
+            <span class="setlist-num">${String(i+1).padStart(2,'0')}</span>
+            <div class="setlist-info">
+              ${it.moment ? `<p class="setlist-moment">${escapeHtml(it.moment)}</p>`:''}
+              <p class="setlist-song">${escapeHtml(song.title)}</p>
+              ${song.artist?`<p class="setlist-artist">${escapeHtml(song.artist)}</p>`:''}
+            </div>
+            <span class="setlist-stamp">${escapeHtml(song.tom||'—')}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function openMuralModal(){
+  if(state.songs.length===0){
+    openModal(`
+      <div class="modal-head"><h3>Editar mural</h3><button class="icon-btn" onclick="closeModal()" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+      <p style="font-size:13.5px;color:var(--muted)">Adicione músicas ao catálogo primeiro, antes de montar o mural.</p>
+      <div class="modal-actions"><button class="btn btn-dark" onclick="closeModal()">Entendi</button></div>
+    `);
+    return;
+  }
+  const date = state.mural.date || nextSundayISO();
+  const items = state.mural.items && state.mural.items.length ? [...state.mural.items].sort((a,b)=>a.order-b.order) : [];
+  window._muralDraft = JSON.parse(JSON.stringify(items));
+  openModal(`
+    <div class="modal-head">
+      <h3>Editar mural</h3>
+      <button class="icon-btn" onclick="closeModal()" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="field"><label>Data do culto</label><input class="input" type="date" id="m_date" value="${date}"></div>
+    <div class="field"><label>Adicionar música</label>
+      <div style="display:flex; gap:8px;">
+        <select class="input" id="m_songSelect" style="flex:1;">
+          ${state.songs.slice().sort((a,b)=>a.title.localeCompare(b.title,'pt-BR')).map(s=>`<option value="${s.id}">${escapeHtml(s.title)}</option>`).join('')}
+        </select>
+        <input class="input" id="m_moment" placeholder="Momento (ex: Abertura)" style="flex:1;">
+        <button class="btn btn-sm" onclick="muralAddItem()">+</button>
+      </div>
+    </div>
+    <div id="m_itemsWrap"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-dark" onclick="saveMural()">Salvar mural</button>
+    </div>
+  `);
+  renderMuralDraftItems();
+}
+
+function renderMuralDraftItems(){
+  const wrap = document.getElementById('m_itemsWrap');
+  const items = window._muralDraft;
+  if(items.length===0){
+    wrap.innerHTML = `<p class="hint" style="margin-bottom:10px;">Nenhuma música adicionada ainda.</p>`;
+    return;
+  }
+  wrap.innerHTML = `<div class="repeater">${items.map((it,i)=>{
+    const song = state.songs.find(s=>s.id===it.songId);
+    return `<div class="repeater-row">
+      <span class="mono" style="font-size:12px;color:var(--muted);width:18px;">${i+1}</span>
+      <span style="flex:1;font-size:13px;">${escapeHtml(song?.title||'?')}${it.moment?` <span style="color:var(--muted)">— ${escapeHtml(it.moment)}</span>`:''}</span>
+      <button class="icon-btn" onclick="muralMove(${i},-1)" aria-label="Subir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+      <button class="icon-btn" onclick="muralMove(${i},1)" aria-label="Descer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></button>
+      <button class="icon-btn" onclick="muralRemove(${i})" aria-label="Remover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>`;
+  }).join('')}</div>`;
+}
+function muralAddItem(){
+  const songId = document.getElementById('m_songSelect').value;
+  const moment = document.getElementById('m_moment').value.trim();
+  window._muralDraft.push({songId, moment, order: window._muralDraft.length});
+  document.getElementById('m_moment').value='';
+  renderMuralDraftItems();
+}
+function muralMove(i, dir){
+  const arr = window._muralDraft;
+  const j = i+dir;
+  if(j<0 || j>=arr.length) return;
+  [arr[i],arr[j]] = [arr[j],arr[i]];
+  renderMuralDraftItems();
+}
+function muralRemove(i){
+  window._muralDraft.splice(i,1);
+  renderMuralDraftItems();
+}
+async function saveMural(){
+  const date = document.getElementById('m_date').value;
+  const items = window._muralDraft.map((it,i)=>({...it, order:i}));
+  state.mural = {date, items};
+  await saveKey('mural__v1', state.mural);
+  closeModal();
+  renderMural();
+  showToast('Mural atualizado.');
+}
+
+/* ================= AGENDA ================= */
+function renderAgenda(){
+  const wrap = document.getElementById('agendaWrap');
+  const today = new Date().toISOString().slice(0,10);
+  const events = state.agenda.filter(e=>e.date >= today).sort((a,b)=>a.date.localeCompare(b.date));
+  const past = state.agenda.filter(e=>e.date < today);
+
+  if(state.agenda.length===0){
+    wrap.innerHTML = emptyState(
+      '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
+      'Nenhuma data na agenda',
+      state.isAdmin ? 'Clique em "Nova data" para criar a primeira escala.' : 'O líder ainda não publicou as próximas escalas.'
+    );
+    return;
+  }
+  if(events.length===0){
+    wrap.innerHTML = emptyState('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>', 'Sem datas futuras', 'Todas as datas cadastradas já passaram.');
+    return;
+  }
+
+  wrap.innerHTML = events.map(e=>agendaCardHtml(e)).join('');
+}
+
+function agendaCardHtml(e){
+  return `<div class="agenda-card">
+    <div class="agenda-top">
+      <div>
+        <p class="agenda-date">${fmtDateLong(e.date)}</p>
+        ${e.time ? `<p class="agenda-time">${escapeHtml(e.time)}</p>`:''}
+      </div>
+      ${state.isAdmin ? `
+        <div style="display:flex;gap:6px;">
+          <button class="icon-btn" onclick="openEventModal('${e.id}')" aria-label="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+          <button class="icon-btn" onclick="deleteEvent('${e.id}')" aria-label="Excluir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg></button>
+        </div>` : ''}
+    </div>
+    ${e.desc ? `<p class="agenda-desc">${escapeHtml(e.desc)}</p>`:''}
+    <div class="team-grid">
+      ${(e.team||[]).map(m=>`<div class="team-chip"><span class="team-avatar">${escapeHtml(initials(m.name))}</span>${escapeHtml(m.name)} <span class="team-role">${escapeHtml(m.role||'')}</span></div>`).join('') || '<span class="hint">Escala ainda não definida.</span>'}
+    </div>
+  </div>`;
+}
+
+function openEventModal(id){
+  const ev = id ? state.agenda.find(e=>e.id===id) : null;
+  window._teamDraft = ev ? JSON.parse(JSON.stringify(ev.team||[])) : [];
+  openModal(`
+    <div class="modal-head">
+      <h3>${ev ? 'Editar data' : 'Nova data'}</h3>
+      <button class="icon-btn" onclick="closeModal()" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Data *</label><input class="input" type="date" id="e_date" value="${ev?.date||nextSundayISO()}"></div>
+      <div class="field" style="max-width:120px;"><label>Horário</label><input class="input" id="e_time" value="${escapeHtml(ev?.time||'')}" placeholder="19:00"></div>
+    </div>
+    <div class="field"><label>Observação</label><input class="input" id="e_desc" value="${escapeHtml(ev?.desc||'')}" placeholder="Ex: Culto de domingo, Ensaio geral..."></div>
+    <div class="field"><label>Escala</label>
+      <div style="display:flex; gap:8px;">
+        <input class="input" id="t_name" placeholder="Nome" style="flex:1;">
+        <input class="input" id="t_role" placeholder="Função (ex: vocal)" style="flex:1;">
+        <button class="btn btn-sm" onclick="teamAdd()">+</button>
+      </div>
+    </div>
+    <div id="t_wrap"></div>
+    <p class="error-msg" id="eventError" style="display:none;">Escolha uma data.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-dark" onclick="saveEvent(${ev?`'${ev.id}'`:'null'})">Salvar</button>
+    </div>
+  `);
+  renderTeamDraft();
+}
+function renderTeamDraft(){
+  const wrap = document.getElementById('t_wrap');
+  const team = window._teamDraft;
+  if(team.length===0){ wrap.innerHTML = `<p class="hint" style="margin-bottom:10px;">Ninguém na escala ainda.</p>`; return; }
+  wrap.innerHTML = `<div class="repeater">${team.map((m,i)=>`
+    <div class="repeater-row">
+      <span class="team-avatar">${escapeHtml(initials(m.name))}</span>
+      <span style="flex:1;font-size:13px;">${escapeHtml(m.name)} <span style="color:var(--muted)">— ${escapeHtml(m.role||'')}</span></span>
+      <button class="icon-btn" onclick="teamRemove(${i})" aria-label="Remover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>`).join('')}</div>`;
+}
+function teamAdd(){
+  const name = document.getElementById('t_name').value.trim();
+  const role = document.getElementById('t_role').value.trim();
+  if(!name) return;
+  window._teamDraft.push({name, role});
+  document.getElementById('t_name').value='';
+  document.getElementById('t_role').value='';
+  renderTeamDraft();
+}
+function teamRemove(i){ window._teamDraft.splice(i,1); renderTeamDraft(); }
+
+async function saveEvent(id){
+  const date = document.getElementById('e_date').value;
+  if(!date){ document.getElementById('eventError').style.display='block'; return; }
+  const time = document.getElementById('e_time').value.trim();
+  const desc = document.getElementById('e_desc').value.trim();
+  const team = window._teamDraft;
+  if(id){
+    const e = state.agenda.find(e=>e.id===id);
+    Object.assign(e, {date, time, desc, team});
+  } else {
+    state.agenda.push({id:uid(), date, time, desc, team});
+  }
+  await saveKey('agenda__v1', state.agenda);
+  closeModal();
+  renderAgenda();
+  showToast('Agenda atualizada.');
+}
+async function deleteEvent(id){
+  if(!confirm('Remover esta data da agenda?')) return;
+  state.agenda = state.agenda.filter(e=>e.id!==id);
+  await saveKey('agenda__v1', state.agenda);
+  renderAgenda();
+  showToast('Data removida.');
+}
+
+/* ================= VOZES ================= */
+const VOZ_TIPOS = ['Melodia','Tenor','Contralto','Soprano'];
+
+function openVozesModal(songId){
+  const song = state.songs.find(s=>s.id===songId);
+  if(!song) return;
+  openModal(`
+    <div class="modal-head">
+      <h3>Vozes — ${escapeHtml(song.title)}</h3>
+      <button class="icon-btn" onclick="closeModal()" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div id="vozListWrap"></div>
+    ${state.isAdmin ? `
+    <div class="voz-add-section">
+      <p style="font-size:12px; font-weight:600; color:var(--ink-soft); margin:0 0 10px;">Adicionar voz</p>
+      <div class="field">
+        <label>Tipo de voz</label>
+        <select class="input" id="voz_tipo" style="width:100%;">
+          ${VOZ_TIPOS.map(t=>`<option value="${t}">${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>Áudio</label>
+        <label class="voz-file-label" for="voz_fileInput">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          <span id="voz_fileLabel">Selecionar arquivo de áudio…</span>
+        </label>
+        <input type="file" id="voz_fileInput" accept="audio/*" onchange="vozFileSelected(this)">
+      </div>
+      <p class="error-msg" id="vozError" style="display:none;">Selecione um arquivo de áudio.</p>
+      <div class="modal-actions" style="margin-top:10px;">
+        <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
+        <button class="btn btn-dark" onclick="addVoz('${songId}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
+          Salvar voz
+        </button>
+      </div>
+    </div>` : `
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn btn-dark" onclick="closeModal()">Fechar</button>
+    </div>`}
+  `);
+  renderVozesList(songId);
+}
+
+function renderVozesList(songId){
+  const wrap = document.getElementById('vozListWrap');
+  if(!wrap) return;
+  const vozes = state.voices[songId] || [];
+  if(vozes.length === 0){
+    wrap.innerHTML = `<p class="voz-empty">Nenhuma voz adicionada ainda.</p>`;
+    return;
+  }
+  wrap.innerHTML = `<div style="margin-bottom:6px;">${vozes.map((v,i)=>`
+    <div class="voz-row">
+      <span class="voz-type-badge">${escapeHtml(v.tipo)}</span>
+      <audio class="voz-audio" controls src="${v.dataUrl}"></audio>
+      ${state.isAdmin ? `<button class="icon-btn" onclick="deleteVoz('${songId}','${v.id}')" aria-label="Remover">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+      </button>` : ''}
+    </div>`).join('')}</div>`;
+}
+
+function vozFileSelected(input){
+  const label = document.getElementById('voz_fileLabel');
+  if(input.files && input.files[0]){
+    label.textContent = input.files[0].name;
+  } else {
+    label.textContent = 'Selecionar arquivo de áudio…';
+  }
+}
+
+async function addVoz(songId){
+  const fileInput = document.getElementById('voz_fileInput');
+  const tipo = document.getElementById('voz_tipo').value;
+  const errEl = document.getElementById('vozError');
+  if(!fileInput.files || !fileInput.files[0]){
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+  const file = fileInput.files[0];
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  if(!state.voices[songId]) state.voices[songId] = [];
+  state.voices[songId].push({id: uid(), tipo, dataUrl});
+  await saveKey('voices__v1', state.voices);
+  renderVozesList(songId);
+  renderCatalog();
+  fileInput.value = '';
+  document.getElementById('voz_fileLabel').textContent = 'Selecionar arquivo de áudio…';
+  showToast('Voz adicionada.');
+}
+
+async function deleteVoz(songId, voiceId){
+  if(!confirm('Remover esta gravação de voz?')) return;
+  state.voices[songId] = (state.voices[songId]||[]).filter(v=>v.id!==voiceId);
+  await saveKey('voices__v1', state.voices);
+  renderVozesList(songId);
+  renderCatalog();
+  showToast('Voz removida.');
+}
+
+/* ================= INIT ================= */
+async function init(){
+  renderTabs();
+  switchTab('catalogo');
+  state.songs = await loadKey('songs__v1', []);
+  state.mural = await loadKey('mural__v1', {date:'', items:[]});
+  state.agenda = await loadKey('agenda__v1', []);
+  state.tagDefs = await loadKey('tagDefs__v1', []);
+  state.voices = await loadKey('voices__v1', {});
+  renderAdminUI();
+  renderCatalog();
+  renderMural();
+  renderAgenda();
+}
+init();
+</script>
+</body>
+</html>
