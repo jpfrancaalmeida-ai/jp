@@ -711,14 +711,14 @@ function renderImportBar(){
     <button class="btn btn-sm btn-dark" onclick="importDriveBatch()">Importar agora</button>
   </div>`;
 }
-async function importDriveBatch(){
+async function importDriveBatch(silent=false){
   const pending = pendingImportBatch();
   if(pending.length === 0) return;
   pending.forEach(s => state.songs.push({id:uid(), title:s.title, artist:s.artist||'', tom:s.tom||'', tags:[], chordLink:s.chordLink||'', category:s.category||'musica'}));
   await saveKey('songs__v1', state.songs);
   renderCatalog();
   renderImportBar();
-  showToast(`${pending.length} item(ns) importado(s) com sucesso.`);
+  if(!silent) showToast(`${pending.length} item(ns) importado(s) com sucesso.`);
 }
 
 function doLogin(){
@@ -1248,6 +1248,10 @@ function openVozesModal(songId){
         </select>
       </div>
       <div class="field">
+        <label>Nome / identificação (opcional)</label>
+        <input class="input" id="voz_nome" placeholder="Ex: João — ensaio 12/06" style="width:100%;">
+      </div>
+      <div class="field">
         <label>Áudio</label>
         <label class="voz-file-label" for="voz_fileInput">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -1281,7 +1285,10 @@ function renderVozesList(songId){
   }
   wrap.innerHTML = `<div style="margin-bottom:6px;">${vozes.map((v,i)=>`
     <div class="voz-row">
-      <span class="voz-type-badge">${escapeHtml(v.tipo)}</span>
+      <div style="display:flex;flex-direction:column;gap:2px;flex:none;">
+        <span class="voz-type-badge">${escapeHtml(v.tipo)}</span>
+        ${v.nome ? `<span style="font-size:10.5px;color:var(--muted);text-align:center;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(v.nome)}">${escapeHtml(v.nome)}</span>` : ''}
+      </div>
       <audio class="voz-audio" controls src="${v.dataUrl}"></audio>
       ${state.isAdmin ? `<button class="icon-btn" onclick="deleteVoz('${songId}','${v.id}')" aria-label="Remover">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
@@ -1308,6 +1315,7 @@ async function addVoz(songId){
   }
   errEl.style.display = 'none';
   const file = fileInput.files[0];
+  const nome = (document.getElementById('voz_nome').value||'').trim();
   const dataUrl = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => resolve(e.target.result);
@@ -1315,12 +1323,13 @@ async function addVoz(songId){
     reader.readAsDataURL(file);
   });
   if(!state.voices[songId]) state.voices[songId] = [];
-  state.voices[songId].push({id: uid(), tipo, dataUrl});
+  state.voices[songId].push({id: uid(), tipo, nome, dataUrl});
   await saveKey('voices__v1', state.voices);
   renderVozesList(songId);
   renderCatalog();
   fileInput.value = '';
   document.getElementById('voz_fileLabel').textContent = 'Selecionar arquivo de áudio…';
+  document.getElementById('voz_nome').value = '';
   showToast('Voz adicionada.');
 }
 
@@ -1342,6 +1351,7 @@ async function init(){
   state.agenda = await loadKey('agenda__v1', []);
   state.tagDefs = await loadKey('tagDefs__v1', []);
   state.voices = await loadKey('voices__v1', {});
+  await importDriveBatch(true);
   renderAdminUI();
   renderCatalog();
   renderMural();
