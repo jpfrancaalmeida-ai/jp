@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const os = require('os');
 const path = require('path');
 
 const app = express();
@@ -8,6 +9,9 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
+app.get('/p/:token', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'player.html'));
+});
 
 const KEYWORDS = [
   'Cabra','Laranja','Medo','Macaco','Raiva','Cobra','Bigode','Urso','Segurança','Armadura',
@@ -26,55 +30,46 @@ const KEYWORDS = [
   'Detetive','Bicicleta','Pirata','Enfermeira','Médico','Soldado','Cozinheiro','Luz','Banana','Circo',
   'Chocolate','Planeta','Mapa','Presidente','Guerra','Tesouro','Alto','Camisa','Malvado','Frio',
   'Barco','Diamante','Cama','Violão','Azul','Abacate','Bola','Cogumelo','Madeira','Livro',
-  'Gato','Primavera','Pombo','Bolsa','Flecha','Marrom','Salada','Lentilhas','Tórax','Sobremesa',
+  'Gato','Primavera','Pombo','Bolsa','Flecha','Marrom','Lentilhas','Tórax','Sobremesa','Feijão',
+  'Espada','Coroa','Bruxa','Fada','Gigante','Navio','Foguete','Fantasma','Feitiço','Dragão',
 ];
 
-const rooms = {};
-
-function pick(n) {
-  const s = [...KEYWORDS].sort(() => Math.random() - 0.5);
-  return s.slice(0, n);
+function getLocalIP() {
+  for (const ifaces of Object.values(os.networkInterfaces())) {
+    for (const iface of ifaces) {
+      if (iface.family === 'IPv4' && !iface.internal) return iface.address;
+    }
+  }
+  return 'localhost';
 }
 
-function buildGrid(size) {
-  const letters = ['A','B','C','D','E'].slice(0, size);
-  const numbers = [1,2,3,4,5].slice(0, size);
-  const words = pick(size * 2);
-  const rows = {}, cols = {};
-  letters.forEach((l, i) => { rows[l] = words[i]; });
-  numbers.forEach((n, i) => { cols[n] = words[size + i]; });
-  return { rows, cols, letters, numbers };
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
-function buildPile(size) {
-  const letters = ['A','B','C','D','E'].slice(0, size);
-  const numbers = [1,2,3,4,5].slice(0, size);
-  const cards = [];
-  letters.forEach(l => numbers.forEach(n => cards.push(`${l}${n}`)));
-  return cards.sort(() => Math.random() - 0.5);
-}
+function rnd(n) { return Math.random().toString(36).substr(2, n); }
 
-function dealCard(room) {
-  return room.pile.length > 0 ? room.pile.pop() : null;
-}
+const rooms = new Map();
+const tokenMap = new Map(); // token -> { roomCode, playerIndex }
 
-function roomPublicState(room) {
+function publicState(room, code) {
   return {
-    code: room.code,
-    host: room.host,
+    code, phase: room.phase,
     gridSize: room.gridSize,
-    useTimer: room.useTimer,
-    phase: room.phase,
-    grid: room.grid,
+    letters: room.letters, numbers: room.numbers,
+    rows: room.rows, cols: room.cols,
     placed: room.placed,
-    usedClues: [...(room.usedClues || [])],
-    score: room.score,
-    pileCount: room.pile ? room.pile.length : 0,
+    usedClues: [...room.usedClues],
+    score: room.score, pileCount: room.pile.length,
     players: room.players.map(p => ({
-      id: p.id,
-      name: p.name,
+      index: p.index, name: p.name,
       cardCount: p.cards.length,
-      online: p.online,
+      connected: !!p.playerSocketId,
     })),
     currentClue: room.currentClue,
     groupGuess: room.groupGuess,
@@ -83,197 +78,231 @@ function roomPublicState(room) {
   };
 }
 
-function broadcastState(roomCode) {
-  const room = rooms[roomCode];
+function playerState(room, idx) {
+  const p = room.players[idx];
+  return {
+    name: p.name, playerIndex: idx,
+    cards: p.cards.map(coord => {
+      const l = coord[0], n = parseInt(coord[1]);
+      return { coord, rowWord: room.rows[l] || '?', colWord: room.cols[n] || '?' };
+    }),
+    canDraw: p.cards.length < 2 && room.pile.length > 0 && room.phase === 'thinking',
+    phase: room.phase,
+    currentClue: room.currentClue,
+    isGiving: room.currentClue?.playerIndex === idx,
+    score: room.score,
+  };
+}
+
+function broadcast(code) {
+  const room = rooms.get(code);
   if (!room) return;
-  const pub = roomPublicState(room);
+  if (room.hostSocketId) io.to(room.hostSocketId).emit('gameState', publicState(room, code));
   room.players.forEach(p => {
-    if (!p.online) return;
-    io.to(p.id).emit('state', {
-      ...pub,
-      myCards: p.cards,
-    });
+    if (p.playerSocketId) io.to(p.playerSocketId).emit('myState', playerState(room, p.index));
   });
 }
 
-function startGame(roomCode) {
-  const room = rooms[roomCode];
-  room.grid = buildGrid(room.gridSize);
-  room.pile = buildPile(room.gridSize);
-  room.placed = {};
-  room.usedClues = new Set();
-  room.score = 0;
-  room.phase = 'thinking';
-  room.currentClue = null;
-  room.groupGuess = null;
-  room.lastResult = null;
-  room.timeLeft = null;
-
-  const handSize = room.players.length <= 3 ? 2 : 1;
-  room.players.forEach(p => {
-    p.cards = [];
-    for (let i = 0; i < handSize; i++) {
-      const c = dealCard(room);
-      if (c) p.cards.push(c);
-    }
-  });
-
-  if (room.useTimer) {
-    const minutes = room.gridSize === 5 ? 10 : 5;
-    room.timeLeft = minutes * 60;
-    if (room.timerInterval) clearInterval(room.timerInterval);
-    room.timerInterval = setInterval(() => {
-      room.timeLeft--;
-      if (room.timeLeft <= 0) endGame(roomCode);
-      else broadcastState(roomCode);
-    }, 1000);
-  }
-}
-
-function endGame(roomCode) {
-  const room = rooms[roomCode];
+function endGame(code) {
+  const room = rooms.get(code);
   if (!room) return;
   if (room.timerInterval) { clearInterval(room.timerInterval); room.timerInterval = null; }
   room.phase = 'ended';
-  broadcastState(roomCode);
+  broadcast(code);
 }
 
-function checkGameEnd(roomCode) {
-  const room = rooms[roomCode];
-  const allEmpty = room.players.every(p => p.cards.length === 0);
-  if (room.pile.length === 0 && allEmpty) {
-    endGame(roomCode);
-    return true;
-  }
-  return false;
-}
+io.on('connection', socket => {
 
-io.on('connection', (socket) => {
-  socket.on('createRoom', ({ name, gridSize, useTimer }) => {
-    const code = Math.random().toString(36).substr(2, 5).toUpperCase();
-    rooms[code] = {
-      code, host: socket.id,
-      gridSize: gridSize || 4,
-      useTimer: !!useTimer,
-      phase: 'lobby',
-      players: [{ id: socket.id, name, cards: [], online: true }],
-      grid: null, pile: [], placed: {}, usedClues: new Set(),
-      score: 0, currentClue: null, groupGuess: null, lastResult: null,
-      timerInterval: null, timeLeft: null,
-    };
-    socket.join(code);
-    socket.data.roomCode = code;
-    socket.data.name = name;
-    broadcastState(code);
-  });
+  socket.on('setupGame', ({ names, gridSize, cronoMin }) => {
+    const code = rnd(5).toUpperCase();
+    const localIP = getLocalIP();
+    const port = process.env.PORT || 3000;
 
-  socket.on('joinRoom', ({ name, code }) => {
-    const room = rooms[code];
-    if (!room) { socket.emit('error', 'Sala não encontrada.'); return; }
-    if (room.phase !== 'lobby') { socket.emit('error', 'A partida já começou.'); return; }
-    if (room.players.length >= 8) { socket.emit('error', 'Sala cheia.'); return; }
-    room.players.push({ id: socket.id, name, cards: [], online: true });
-    socket.join(code);
+    const players = names.map((name, i) => ({
+      index: i, name, token: rnd(8), cards: [], playerSocketId: null,
+    }));
+    players.forEach(p => tokenMap.set(p.token, { roomCode: code, playerIndex: p.index }));
+
+    rooms.set(code, {
+      phase: 'lobby', gridSize, cronoMin,
+      letters: [], numbers: [], rows: {}, cols: {},
+      pile: [], placed: {}, usedClues: new Set(),
+      score: 0, players,
+      currentClue: null, groupGuess: null, lastResult: null,
+      timeLeft: null, timerInterval: null,
+      hostSocketId: socket.id, localIP, port,
+    });
+
     socket.data.roomCode = code;
-    socket.data.name = name;
-    broadcastState(code);
+    socket.data.role = 'host';
+
+    socket.emit('roomCreated', {
+      code, localIP, port,
+      players: players.map(p => ({
+        name: p.name,
+        url: `http://${localIP}:${port}/p/${p.token}`,
+      })),
+    });
   });
 
   socket.on('startGame', () => {
     const code = socket.data.roomCode;
-    const room = rooms[code];
-    if (!room || room.host !== socket.id) return;
-    if (room.players.length < 2) { socket.emit('error', 'Mínimo 2 jogadores.'); return; }
-    startGame(code);
-    broadcastState(code);
-  });
+    const room = rooms.get(code);
+    if (!room || socket.data.role !== 'host') return;
 
-  socket.on('updateSettings', ({ gridSize, useTimer }) => {
-    const code = socket.data.roomCode;
-    const room = rooms[code];
-    if (!room || room.host !== socket.id || room.phase !== 'lobby') return;
-    if (gridSize) room.gridSize = gridSize;
-    if (useTimer !== undefined) room.useTimer = useTimer;
-    broadcastState(code);
-  });
+    const letters = 'ABCDE'.slice(0, room.gridSize).split('');
+    const numbers = [1,2,3,4,5].slice(0, room.gridSize);
+    const words = shuffle(KEYWORDS).slice(0, room.gridSize * 2);
 
-  socket.on('submitClue', ({ clue, cardCoord }) => {
-    const code = socket.data.roomCode;
-    const room = rooms[code];
-    if (!room || room.phase !== 'thinking') return;
-    const player = room.players.find(p => p.id === socket.id);
-    if (!player) return;
-    if (!player.cards.includes(cardCoord)) { socket.emit('error', 'Carta inválida.'); return; }
-    const clueClean = clue.trim().toLowerCase();
-    if (!clueClean || clueClean.includes(' ')) { socket.emit('error', 'Dica deve ser uma única palavra.'); return; }
-    if (room.usedClues.has(clueClean)) { socket.emit('error', 'Esta dica já foi usada.'); return; }
+    room.letters = letters;
+    room.numbers = numbers;
+    room.rows = Object.fromEntries(letters.map((l, i) => [l, words[i]]));
+    room.cols = Object.fromEntries(numbers.map((n, i) => [n, words[room.gridSize + i]]));
 
-    room.phase = 'guessing';
-    room.currentClue = { playerId: socket.id, playerName: player.name, clue: clue.trim(), cardCoord };
+    const pile = [];
+    letters.forEach(l => numbers.forEach(n => pile.push(`${l}${n}`)));
+    room.pile = shuffle(pile);
+    room.placed = {};
+    room.usedClues = new Set();
+    room.score = 0;
+    room.phase = 'thinking';
+    room.currentClue = null;
     room.groupGuess = null;
     room.lastResult = null;
-    broadcastState(code);
+
+    // 1 card per player to start
+    room.players.forEach(p => {
+      p.cards = [];
+      const c = room.pile.pop();
+      if (c) p.cards.push(c);
+    });
+
+    if (room.cronoMin > 0) {
+      room.timeLeft = room.cronoMin * 60;
+      room.timerInterval = setInterval(() => {
+        room.timeLeft--;
+        broadcast(code);
+        if (room.timeLeft <= 0) endGame(code);
+      }, 1000);
+    }
+
+    broadcast(code);
+  });
+
+  socket.on('playerConnect', ({ token }) => {
+    const entry = tokenMap.get(token);
+    if (!entry) { socket.emit('playerError', 'Link inválido.'); return; }
+    const room = rooms.get(entry.roomCode);
+    if (!room) { socket.emit('playerError', 'Sala não encontrada.'); return; }
+
+    const p = room.players[entry.playerIndex];
+    p.playerSocketId = socket.id;
+    socket.data.roomCode = entry.roomCode;
+    socket.data.playerIndex = entry.playerIndex;
+    socket.data.role = 'player';
+
+    socket.emit('myState', playerState(room, entry.playerIndex));
+    if (room.hostSocketId) io.to(room.hostSocketId).emit('gameState', publicState(room, entry.roomCode));
+  });
+
+  socket.on('drawCard', () => {
+    const code = socket.data.roomCode;
+    const idx = socket.data.playerIndex;
+    if (idx === undefined) return;
+    const room = rooms.get(code);
+    if (!room || room.phase !== 'thinking') return;
+    const p = room.players[idx];
+    if (p.cards.length >= 2 || room.pile.length === 0) return;
+    p.cards.push(room.pile.pop());
+    broadcast(code);
+  });
+
+  socket.on('submitClue', ({ clue, coord, playerIndex }) => {
+    const code = socket.data.roomCode;
+    const room = rooms.get(code);
+    if (!room || room.phase !== 'thinking') return;
+
+    const pIdx = socket.data.role === 'player' ? socket.data.playerIndex : playerIndex;
+    if (pIdx === undefined || pIdx === null) return;
+    const p = room.players[pIdx];
+    if (!p || !p.cards.includes(coord)) {
+      socket.emit('clueError', 'Carta inválida.'); return;
+    }
+
+    const clean = clue.trim().toLowerCase();
+    if (!clean || clean.includes(' ')) { socket.emit('clueError', 'Uma única palavra.'); return; }
+    if (room.usedClues.has(clean)) { socket.emit('clueError', 'Dica já foi usada.'); return; }
+
+    room.phase = 'guessing';
+    room.currentClue = { playerIndex: pIdx, playerName: p.name, clue: clue.trim(), coord };
+    room.groupGuess = null;
+    room.lastResult = null;
+    broadcast(code);
   });
 
   socket.on('setGroupGuess', ({ coord }) => {
     const code = socket.data.roomCode;
-    const room = rooms[code];
-    if (!room || room.phase !== 'guessing') return;
-    if (room.currentClue && room.currentClue.playerId === socket.id) return; // clue giver can't guess
+    const room = rooms.get(code);
+    if (!room || room.phase !== 'guessing' || socket.data.role !== 'host') return;
     room.groupGuess = coord;
-    broadcastState(code);
+    broadcast(code);
+  });
+
+  // Host requests a player's card list (to fill the clue form when player has no phone)
+  socket.on('requestPlayerCards', ({ playerIndex }) => {
+    const code = socket.data.roomCode;
+    const room = rooms.get(code);
+    if (!room || socket.data.role !== 'host') return;
+    const p = room.players[playerIndex];
+    if (!p) return;
+    const cards = p.cards.map(coord => {
+      const l = coord[0], n = parseInt(coord[1]);
+      return { coord, rowWord: room.rows[l] || '?', colWord: room.cols[n] || '?' };
+    });
+    socket.emit('playerCardsForHost', { playerIndex, cards });
   });
 
   socket.on('confirmGuess', () => {
     const code = socket.data.roomCode;
-    const room = rooms[code];
-    if (!room || room.phase !== 'guessing' || !room.groupGuess) return;
-    if (room.currentClue && room.currentClue.playerId === socket.id) return;
+    const room = rooms.get(code);
+    if (!room || room.phase !== 'guessing' || !room.groupGuess || !room.currentClue) return;
+    if (socket.data.role !== 'host') return;
 
-    const correct = room.groupGuess === room.currentClue.cardCoord;
+    const correct = room.groupGuess === room.currentClue.coord;
     room.usedClues.add(room.currentClue.clue.toLowerCase());
 
     if (correct) {
-      room.placed[room.currentClue.cardCoord] = {
-        clue: room.currentClue.clue,
-        playerName: room.currentClue.playerName,
-      };
+      room.placed[room.currentClue.coord] = { clue: room.currentClue.clue, playerName: room.currentClue.playerName };
       room.score++;
     }
 
-    // Remove card from player's hand
-    const player = room.players.find(p => p.id === room.currentClue.playerId);
-    if (player) {
-      player.cards = player.cards.filter(c => c !== room.currentClue.cardCoord);
-      const newCard = dealCard(room);
-      if (newCard) player.cards.push(newCard);
+    const p = room.players[room.currentClue.playerIndex];
+    p.cards = p.cards.filter(c => c !== room.currentClue.coord);
+    // Repõe 1 carta (mantém no máximo o que o jogador já tem na mão + 1)
+    if (room.pile.length > 0 && p.cards.length === 0) {
+      p.cards.push(room.pile.pop());
     }
 
-    room.lastResult = { correct, coord: room.currentClue.cardCoord, guess: room.groupGuess, clue: room.currentClue.clue };
+    room.lastResult = { correct, coord: room.currentClue.coord, guess: room.groupGuess, clue: room.currentClue.clue };
     room.currentClue = null;
     room.groupGuess = null;
     room.phase = 'thinking';
 
-    if (!checkGameEnd(code)) broadcastState(code);
+    const allEmpty = room.players.every(p => p.cards.length === 0) && room.pile.length === 0;
+    if (allEmpty) { endGame(code); } else { broadcast(code); }
   });
 
   socket.on('disconnect', () => {
     const code = socket.data.roomCode;
     if (!code) return;
-    const room = rooms[code];
+    const room = rooms.get(code);
     if (!room) return;
-    const player = room.players.find(p => p.id === socket.id);
-    if (player) player.online = false;
-    broadcastState(code);
-    // cleanup empty rooms
-    setTimeout(() => {
-      if (room && room.players.every(p => !p.online)) {
-        if (room.timerInterval) clearInterval(room.timerInterval);
-        delete rooms[code];
-      }
-    }, 60000);
+    if (socket.data.role === 'player' && socket.data.playerIndex !== undefined) {
+      room.players[socket.data.playerIndex].playerSocketId = null;
+      if (room.hostSocketId) io.to(room.hostSocketId).emit('gameState', publicState(room, code));
+    }
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Entre Linhas rodando em http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`Entre Linhas → http://localhost:${PORT}`));

@@ -6,824 +6,684 @@
 <title>Entre Linhas</title>
 <script src="/socket.io/socket.io.js"></script>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --rosa:#c94070;--verde:#2e9e5b;--escuro:#2a1a0e;
+  --amarelo:#f5c842;--fundo:#f5f0e8;
+  --left-w:270px;--right-w:250px;--header-h:52px;
+  --cell:80px;
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--fundo);color:var(--escuro);overflow:hidden;height:100vh;}
 
-body {
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  background: #f5f0e8;
-  color: #2a1a0e;
-  min-height: 100vh;
+/* ── SETUP ────────────────────────────────── */
+#setup{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:20px;padding:20px;overflow-y:auto;}
+#setup.hidden{display:none;}
+.logo{font-size:clamp(2rem,6vw,3.5rem);font-weight:900;line-height:1;}
+.logo span{color:var(--rosa);}
+.setup-card{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:480px;box-shadow:0 2px 16px rgba(0,0,0,.08);}
+.setup-card h2{margin-bottom:16px;font-size:1.1rem;}
+
+.player-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+.player-row input{flex:1;padding:10px 12px;border:2px solid #ddd;border-radius:10px;font-size:.95rem;outline:none;}
+.player-row input:focus{border-color:var(--rosa);}
+.btn-del{background:#fee;color:#c00;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:.95rem;font-weight:700;}
+
+.config-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0;}
+.cfg-label{font-size:.8rem;font-weight:600;color:#666;margin-bottom:5px;}
+select,input[type=text]{width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:10px;font-size:.9rem;background:#fff;outline:none;}
+select:focus{border-color:var(--rosa);}
+
+button{padding:11px 22px;border:none;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;transition:all .12s;}
+button:active{transform:scale(.96);}
+button:disabled{opacity:.4;cursor:default;transform:none;}
+.btn-rosa{background:var(--rosa);color:#fff;}
+.btn-verde{background:var(--verde);color:#fff;}
+.btn-escuro{background:var(--escuro);color:#fff;}
+.btn-outline{background:transparent;border:2px solid var(--rosa);color:var(--rosa);}
+.btn-full{width:100%;}
+.btn-sm{padding:7px 14px;font-size:.82rem;}
+.err{color:#c00;font-size:.82rem;font-weight:600;margin-top:6px;}
+
+/* ── LINKS DOS JOGADORES ──────────────────── */
+#links-screen{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;padding:20px;}
+#links-screen.active{display:flex;}
+.links-card{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:540px;box-shadow:0 2px 16px rgba(0,0,0,.08);}
+.player-link-item{background:#f9f9f9;border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;}
+.link-name{font-weight:700;min-width:80px;}
+.link-url{font-size:.78rem;color:#555;flex:1;word-break:break-all;font-family:monospace;}
+.btn-copy{background:#eee;color:#333;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:.75rem;font-weight:600;flex-shrink:0;}
+.connected-dot{width:10px;height:10px;border-radius:50%;background:#ddd;flex-shrink:0;}
+.connected-dot.on{background:var(--verde);}
+
+/* ── JOGO: LAYOUT 3 COLUNAS ──────────────── */
+#jogo{display:none;height:100vh;flex-direction:column;}
+#jogo.active{display:flex;}
+
+.game-header{
+  height:var(--header-h);background:var(--escuro);color:#fff;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;gap:12px;flex-shrink:0;
+}
+.game-header .titulo{font-weight:900;font-size:1rem;}
+.pontos{font-weight:700;color:var(--amarelo);font-size:1rem;}
+.timer{font-weight:900;color:var(--amarelo);font-variant-numeric:tabular-nums;}
+.timer.urgente{color:#ff6b6b;animation:pisca .5s step-end infinite;}
+@keyframes pisca{50%{opacity:.3;}}
+.fase-badge{padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:700;}
+.fase-p{background:#e8f5ee;color:var(--verde);}
+.fase-a{background:#fff3f6;color:var(--rosa);}
+
+.game-body{
+  flex:1;display:grid;overflow:hidden;
+  grid-template-columns:var(--left-w) 1fr var(--right-w);
 }
 
-h1 { font-size: clamp(2rem, 6vw, 3.5rem); font-weight: 900; letter-spacing: -1px; }
-h2 { font-size: 1.3rem; font-weight: 700; }
+/* Painéis laterais */
+.painel{padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;}
+.painel-left{border-right:1px solid #e0d8cc;}
+.painel-right{border-left:1px solid #e0d8cc;}
+.sec-titulo{font-size:.72rem;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
+.mini-card{background:#fff;border-radius:10px;padding:12px;box-shadow:0 1px 6px rgba(0,0,0,.06);}
 
-.screen { display: none; padding: 20px; max-width: 900px; margin: 0 auto; }
-.screen.active { display: block; }
-
-/* HOME */
-#home-screen {
-  display: flex; flex-direction: column; align-items: center;
-  justify-content: center; min-height: 100vh; text-align: center; gap: 24px;
+/* Dar dica - botões de jogadores */
+.dar-dica-list{display:flex;flex-direction:column;gap:6px;}
+.dar-dica-btn{
+  background:#fff;border:2px solid #e0d8cc;border-radius:10px;
+  padding:10px 12px;cursor:pointer;text-align:left;width:100%;
+  display:flex;align-items:center;gap:8px;
+  transition:border-color .12s;
 }
-#home-screen.active { display: flex; }
-.logo { line-height: 1; }
-.logo span { color: #c94070; }
-.subtitle { color: #888; font-size: 1rem; }
-.home-buttons { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 320px; }
+.dar-dica-btn:hover{border-color:var(--rosa);}
+.dar-dica-btn .av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#fff;flex-shrink:0;}
+.dar-dica-btn .nome{font-weight:600;font-size:.88rem;flex:1;}
+.dar-dica-btn .cartas{font-size:.72rem;color:#999;}
 
-/* LOBBY */
-#lobby-screen { padding-top: 32px; }
-
-/* GAME */
-#game-screen { max-width: 1100px; }
-
-/* Inputs & Buttons */
-input, select {
-  width: 100%; padding: 12px 16px; border: 2px solid #ddd; border-radius: 10px;
-  font-size: 1rem; background: #fff; outline: none; transition: border-color .2s;
+/* Formulário inline de dica (no painel esq) */
+.clue-form{background:#fff3f6;border:2px solid var(--rosa);border-radius:10px;padding:12px;position:relative;}
+.clue-form .form-titulo{font-size:.8rem;font-weight:700;color:var(--rosa);margin-bottom:8px;}
+.clue-form select,.clue-form input{margin-bottom:8px;}
+.clue-form .actions{display:flex;gap:6px;}
+.btn-x{
+  position:absolute;top:8px;right:8px;
+  background:transparent;border:none;color:#999;
+  font-size:1.1rem;cursor:pointer;line-height:1;padding:2px;
 }
-input:focus, select:focus { border-color: #c94070; }
+.btn-x:hover{color:var(--escuro);}
 
-button {
-  padding: 12px 24px; border: none; border-radius: 10px; font-size: 1rem;
-  font-weight: 700; cursor: pointer; transition: all .15s; white-space: nowrap;
-}
-button:active { transform: scale(.97); }
-
-.btn-primary { background: #c94070; color: #fff; }
-.btn-primary:hover { background: #a8305a; }
-.btn-secondary { background: #2a1a0e; color: #fff; }
-.btn-secondary:hover { background: #44291a; }
-.btn-outline { background: transparent; color: #c94070; border: 2px solid #c94070; }
-.btn-outline:hover { background: #c94070; color: #fff; }
-.btn-success { background: #2e9e5b; color: #fff; }
-.btn-success:hover { background: #22784a; }
-.btn-sm { padding: 8px 16px; font-size: .875rem; }
-.btn-full { width: 100%; }
-button:disabled { opacity: .4; cursor: not-allowed; transform: none; }
-
-/* Cards */
-.card {
-  background: #fff; border-radius: 16px; padding: 20px;
-  box-shadow: 0 2px 12px rgba(0,0,0,.08);
-}
-
-/* Form groups */
-.form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-.form-group label { font-weight: 600; font-size: .9rem; color: #555; }
-.divider { text-align: center; color: #aaa; font-size: .85rem; margin: 8px 0; position: relative; }
-.divider::before, .divider::after {
-  content: ''; position: absolute; top: 50%; width: 42%; height: 1px; background: #ddd;
-}
-.divider::before { left: 0; }
-.divider::after { right: 0; }
-
-/* Room code */
-.room-code {
-  font-size: 2.5rem; font-weight: 900; letter-spacing: 6px; color: #c94070;
-  text-align: center; background: #fff3f6; padding: 16px; border-radius: 12px;
-  cursor: pointer; user-select: all;
-}
+/* Dica ativa */
+.dica-ativa-panel{background:var(--escuro);color:#fff;border-radius:10px;padding:14px;}
+.dica-ativa-de{font-size:.75rem;color:#aaa;margin-bottom:4px;}
+.dica-palavra{font-size:clamp(1.3rem,2.5vw,2rem);font-weight:900;color:var(--amarelo);word-break:break-word;}
+.palpite-info{font-size:.8rem;color:#ccc;margin-top:8px;}
+.palpite-coord{color:var(--amarelo);font-weight:700;}
+.confirmar-row{display:flex;gap:6px;margin-top:8px;align-items:center;}
 
 /* Players list */
-.players-list { display: flex; flex-direction: column; gap: 8px; }
-.player-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px; background: #f9f9f9; border-radius: 10px;
+.player-chip-list{display:flex;flex-direction:column;gap:5px;}
+.player-chip{display:flex;align-items:center;gap:7px;font-size:.82rem;padding:5px 8px;border-radius:8px;background:#f9f9f9;}
+.player-chip .av{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:#fff;flex-shrink:0;}
+.player-chip .pn{font-weight:600;flex:1;}
+.player-chip .pc{color:#999;font-size:.72rem;}
+.dot{width:7px;height:7px;border-radius:50%;background:#ddd;flex-shrink:0;}
+.dot.on{background:var(--verde);}
+
+/* Dicas usadas */
+.tags{display:flex;flex-wrap:wrap;gap:5px;}
+.tag{background:#eee;color:#777;padding:3px 8px;border-radius:20px;font-size:.72rem;text-decoration:line-through;}
+
+/* ── CENTRO: GRID ─────────────────────────── */
+.center-panel{
+  display:flex;align-items:center;justify-content:center;
+  padding:12px;overflow:hidden;
 }
-.player-avatar {
-  width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
-  justify-content: center; font-weight: 700; color: #fff; font-size: 1rem; flex-shrink: 0;
+.grid-wrap{overflow:auto;}
+.grid-table{border-collapse:separate;border-spacing:4px;}
+.ax{
+  background:var(--escuro);color:#fff;border-radius:7px;
+  text-align:center;padding:6px 4px;
+  width:var(--cell);height:var(--cell);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
 }
-.player-name { font-weight: 600; flex: 1; }
-.badge {
-  font-size: .7rem; font-weight: 700; padding: 3px 8px; border-radius: 20px;
-  background: #eee; color: #666;
+.ax-l{font-size:1.1rem;font-weight:900;}
+.ax-w{font-size:.62rem;opacity:.85;margin-top:3px;word-break:break-word;max-width:70px;line-height:1.2;}
+.cell{
+  width:var(--cell);height:var(--cell);
+  border-radius:9px;border:2px solid #ddd;background:#fafafa;
+  cursor:pointer;transition:all .12s;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:3px;
 }
-.badge-host { background: #ffd700; color: #7a5900; }
-.badge-you { background: #c94070; color: #fff; }
-.badge-offline { background: #ddd; color: #999; }
+.cell:hover:not(.colocada):not(.off){border-color:var(--rosa);background:#fff3f6;}
+.cell.sel{border-color:var(--rosa);background:#fff3f6;box-shadow:0 0 0 3px rgba(201,64,112,.2);}
+.cell.colocada{background:#e8f5ee;border-color:var(--verde);cursor:default;}
+.cell.off{cursor:default;}
+.cell-coord{font-size:.6rem;font-weight:700;color:#bbb;}
+.cell-dica{font-size:.65rem;font-weight:700;color:var(--verde);word-break:break-word;margin-top:2px;}
 
-/* Settings grid */
-.settings-row { display: flex; gap: 12px; flex-wrap: wrap; }
-.settings-row > * { flex: 1; min-width: 120px; }
-
-/* GAME SCREEN */
-.game-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px; background: #2a1a0e; color: #fff;
-  position: sticky; top: 0; z-index: 10; gap: 12px; flex-wrap: wrap;
+/* ── OVERLAY: RESULTADO ───────────────────── */
+#overlay-result{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.7);z-index:200;
+  align-items:center;justify-content:center;padding:20px;
 }
-.game-header h2 { color: #fff; font-size: 1.1rem; }
-.score-display { font-size: 1.1rem; font-weight: 700; color: #f5c842; }
-.timer-display {
-  font-size: 1.2rem; font-weight: 900; color: #f5c842;
-  font-variant-numeric: tabular-nums;
+#overlay-result.vis{display:flex;}
+.result-modal{
+  border-radius:20px;padding:36px 28px;max-width:360px;width:100%;text-align:center;
+  position:relative;
 }
-.timer-display.urgent { color: #ff6b6b; animation: blink .5s step-end infinite; }
-@keyframes blink { 50% { opacity: .4; } }
+.result-modal.ok{background:#e8f5ee;border:3px solid var(--verde);}
+.result-modal.err{background:#fde8e8;border:3px solid #e05252;}
+.result-icon{font-size:3.5rem;line-height:1;margin-bottom:10px;}
+.result-title{font-size:1.6rem;font-weight:900;margin-bottom:6px;}
+.result-modal.ok .result-title{color:var(--verde);}
+.result-modal.err .result-title{color:#e05252;}
+.result-detail{color:#555;font-size:.9rem;margin-bottom:20px;}
 
-.game-body { padding: 16px; }
-
-/* Grid */
-.grid-container { overflow-x: auto; margin-bottom: 20px; }
-.grid-table { border-collapse: separate; border-spacing: 4px; min-width: 100%; }
-.grid-table th, .grid-table td { padding: 0; }
-
-.axis-cell {
-  background: #2a1a0e; color: #fff; font-weight: 700;
-  padding: 8px 10px; border-radius: 8px; text-align: center;
-  font-size: clamp(.65rem, 1.5vw, .8rem); white-space: nowrap;
-  max-width: 90px; overflow: hidden; text-overflow: ellipsis;
+/* ── OVERLAY: FIM ─────────────────────────── */
+#overlay-fim{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.75);z-index:200;
+  align-items:center;justify-content:center;padding:20px;
 }
-.axis-letter { font-size: 1.1rem; margin-bottom: 2px; }
-.axis-number { font-size: 1.1rem; margin-bottom: 2px; }
+#overlay-fim.vis{display:flex;}
+.fim-modal{background:#fff;border-radius:20px;padding:40px 28px;max-width:380px;width:100%;text-align:center;position:relative;}
+.pontos-big{font-size:5rem;font-weight:900;color:var(--rosa);line-height:1;}
+.rating{font-size:1.3rem;font-weight:700;margin-top:8px;}
+.rating-guia{font-size:.8rem;color:#aaa;margin-top:6px;}
 
-.grid-cell {
-  width: clamp(60px, 10vw, 90px); height: clamp(60px, 10vw, 90px);
-  border-radius: 10px; border: 2px solid #ddd; background: #fafafa;
-  cursor: pointer; transition: all .15s; position: relative;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; padding: 4px;
-}
-.grid-cell:hover:not(.placed):not(.disabled) { border-color: #c94070; background: #fff3f6; }
-.grid-cell.selected { border-color: #c94070; background: #fff3f6; box-shadow: 0 0 0 3px rgba(201,64,112,.3); }
-.grid-cell.placed { background: #e8f5ee; border-color: #2e9e5b; cursor: default; }
-.grid-cell.wrong-guess { background: #fde8e8; border-color: #e05252; }
-.grid-cell.disabled { cursor: default; }
-.grid-cell.clue-giver-card { border-color: #f5c842; background: #fffbe6; }
-
-.cell-coord { font-size: .7rem; font-weight: 700; color: #aaa; line-height: 1; }
-.cell-clue { font-size: clamp(.6rem, 1.2vw, .75rem); font-weight: 600; color: #2e9e5b; word-break: break-word; }
-.cell-tick { font-size: 1.2rem; }
-
-/* My cards panel */
-.my-cards-panel { margin-bottom: 16px; }
-.my-cards-grid { display: flex; gap: 12px; flex-wrap: wrap; }
-.my-card {
-  border: 2px solid #ddd; border-radius: 12px; padding: 14px;
-  background: #fff; flex: 1; min-width: 150px; max-width: 260px;
-  cursor: pointer; transition: all .15s;
-}
-.my-card:hover { border-color: #c94070; }
-.my-card.selected-card { border-color: #c94070; background: #fff3f6; box-shadow: 0 0 0 3px rgba(201,64,112,.3); }
-.my-card.used { opacity: .4; cursor: default; }
-.card-coord-big { font-size: 1.8rem; font-weight: 900; color: #c94070; line-height: 1; }
-.card-words { font-size: .85rem; color: #555; margin-top: 6px; }
-.card-word { font-weight: 700; color: #2a1a0e; }
-
-/* Clue submit area */
-.clue-area { margin-bottom: 16px; }
-.clue-input-row { display: flex; gap: 8px; }
-.clue-input-row input { flex: 1; }
-
-/* Active clue panel */
-.active-clue-panel {
-  background: #2a1a0e; color: #fff; border-radius: 16px;
-  padding: 20px; margin-bottom: 16px;
-}
-.clue-word { font-size: clamp(1.5rem, 4vw, 2.5rem); font-weight: 900; color: #f5c842; }
-.clue-by { font-size: .85rem; color: #aaa; margin-top: 4px; }
-.guess-instruction { color: #ccc; margin: 12px 0 8px; font-size: .9rem; }
-
-/* Confirm guess bar */
-.confirm-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
-.selected-guess { font-size: 1rem; font-weight: 700; }
-.selected-guess span { color: #f5c842; }
-
-/* Result toast */
-.result-toast {
-  position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
-  padding: 14px 28px; border-radius: 40px; font-size: 1.1rem; font-weight: 700;
-  z-index: 100; animation: slideDown .3s ease;
-  box-shadow: 0 4px 20px rgba(0,0,0,.2); text-align: center;
-}
-.result-toast.correct { background: #2e9e5b; color: #fff; }
-.result-toast.wrong { background: #e05252; color: #fff; }
-@keyframes slideDown { from { top: 40px; opacity: 0; } to { top: 70px; opacity: 1; } }
-
-/* Phase indicator */
-.phase-badge {
-  display: inline-block; padding: 4px 14px; border-radius: 20px;
-  font-size: .8rem; font-weight: 700;
-}
-.phase-thinking { background: #e8f5ee; color: #2e9e5b; }
-.phase-guessing { background: #fff3f6; color: #c94070; }
-
-/* Used clues */
-.used-clues-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.used-clue-tag {
-  background: #eee; color: #666; padding: 4px 10px; border-radius: 20px;
-  font-size: .75rem; text-decoration: line-through;
-}
-
-/* End screen */
-#end-screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 20px; text-align: center; }
-.score-big { font-size: 5rem; font-weight: 900; color: #c94070; line-height: 1; }
-.score-label { font-size: 1.2rem; color: #555; }
-.score-rating { font-size: 1.5rem; font-weight: 700; margin-top: 8px; }
-
-/* Error message */
-.error-msg { color: #e05252; font-size: .85rem; font-weight: 600; margin-top: 6px; }
-
-/* Utilities */
-.text-center { text-align: center; }
-.mt-8 { margin-top: 8px; }
-.mt-16 { margin-top: 16px; }
-.mt-24 { margin-top: 24px; }
-.gap-8 { gap: 8px; }
-.flex { display: flex; }
-.flex-col { flex-direction: column; }
-.align-center { align-items: center; }
-.justify-between { justify-content: space-between; }
-
-/* Colors for avatars */
-.av0 { background: #c94070; }
-.av1 { background: #2e9e5b; }
-.av2 { background: #1e6fc4; }
-.av3 { background: #f5a623; }
-.av4 { background: #9b59b6; }
-.av5 { background: #16a085; }
-.av6 { background: #e74c3c; }
-.av7 { background: #2980b9; }
-
-@media (max-width: 480px) {
-  .home-buttons { max-width: 100%; }
-  .settings-row { flex-direction: column; }
-}
+/* ── CORES ─────────────────────────────────── */
+.av0{background:#c94070;}.av1{background:#2e9e5b;}.av2{background:#1e6fc4;}
+.av3{background:#f5a623;}.av4{background:#9b59b6;}.av5{background:#16a085;}
+.av6{background:#e74c3c;}.av7{background:#2980b9;}
 </style>
 </head>
 <body>
 
-<!-- HOME -->
-<div id="home-screen" class="screen active">
-  <div>
-    <div class="logo">
-      <h1>Entre<span>Linhas</span></h1>
-    </div>
-    <p class="subtitle">Jogo cooperativo de palavras</p>
-  </div>
-
-  <div class="card" style="width:100%;max-width:360px">
-    <div class="form-group">
-      <label>Seu nome</label>
-      <input id="player-name" type="text" placeholder="Como te chamam?" maxlength="20" autocomplete="off">
-    </div>
-    <div class="home-buttons">
-      <button class="btn-primary btn-full" onclick="showCreateRoom()">Criar Sala</button>
-      <div class="divider">ou</div>
-      <div class="flex gap-8">
-        <input id="join-code" type="text" placeholder="Código da sala" maxlength="5" style="text-transform:uppercase;letter-spacing:3px">
-        <button class="btn-secondary" onclick="joinRoom()">Entrar</button>
-      </div>
-    </div>
-    <div id="home-error" class="error-msg"></div>
-  </div>
-</div>
-
-<!-- CREATE ROOM (modal-style overlay inside home) -->
-<div id="create-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;display:none;align-items:center;justify-content:center;padding:20px">
-  <div class="card" style="width:100%;max-width:400px">
-    <h2 style="margin-bottom:16px">Criar Sala</h2>
-    <div class="form-group">
-      <label>Tamanho da tabela</label>
-      <select id="create-grid-size">
-        <option value="3">Expresso 3×3 — Rápido</option>
-        <option value="4" selected>Clássico 4×4 — Padrão</option>
-        <option value="5">Expert 5×5 — Desafiador</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-        <input id="create-timer" type="checkbox" style="width:auto">
-        Usar cronômetro
-      </label>
-    </div>
-    <div class="flex gap-8 mt-16">
-      <button class="btn-outline btn-full" onclick="closeCreateOverlay()">Cancelar</button>
-      <button class="btn-primary btn-full" onclick="createRoom()">Criar</button>
-    </div>
-  </div>
-</div>
-
-<!-- LOBBY -->
-<div id="lobby-screen" class="screen">
-  <div style="max-width:480px;margin:0 auto;padding-top:32px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
-      <h2>Sala</h2>
-      <div class="room-code" id="lobby-code" title="Clique para copiar" onclick="copyCode()">------</div>
-    </div>
-
-    <div class="card" style="margin-bottom:16px">
-      <h2 style="margin-bottom:12px">Jogadores</h2>
-      <div id="lobby-players" class="players-list"></div>
-    </div>
-
-    <div id="lobby-settings" class="card" style="margin-bottom:16px;display:none">
-      <h2 style="margin-bottom:12px">Configurações</h2>
-      <div class="form-group">
-        <label>Tamanho da tabela</label>
-        <select id="lobby-grid-size" onchange="updateSettings()">
-          <option value="3">Expresso 3×3 — Rápido</option>
-          <option value="4" selected>Clássico 4×4 — Padrão</option>
-          <option value="5">Expert 5×5 — Desafiador</option>
+<!-- SETUP -->
+<div id="setup">
+  <div class="logo">Entre<span>Linhas</span></div>
+  <div class="setup-card">
+    <h2>Quem vai jogar?</h2>
+    <div id="player-list"></div>
+    <button class="btn-outline btn-sm" onclick="addPlayer()" id="btn-add" style="margin-bottom:16px">+ Adicionar jogador</button>
+    <div class="config-grid">
+      <div>
+        <div class="cfg-label">Tamanho</div>
+        <select id="gridSize">
+          <option value="3">Expresso 3×3</option>
+          <option value="4" selected>Clássico 4×4</option>
+          <option value="5">Expert 5×5</option>
         </select>
       </div>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-        <input id="lobby-timer" type="checkbox" onchange="updateSettings()" style="width:auto">
-        Usar cronômetro (5 min / 10 min no Expert)
-      </label>
+      <div>
+        <div class="cfg-label">Cronômetro</div>
+        <select id="crono">
+          <option value="0">Sem limite</option>
+          <option value="5">5 minutos</option>
+          <option value="10">10 minutos</option>
+        </select>
+      </div>
     </div>
-
-    <div id="lobby-info" class="card" style="margin-bottom:16px;display:none">
-      <p style="font-size:.9rem;color:#555" id="lobby-settings-info"></p>
-    </div>
-
-    <div id="lobby-error" class="error-msg" style="margin-bottom:8px"></div>
-    <button id="start-btn" class="btn-primary btn-full" onclick="startGame()" style="display:none">
-      Iniciar Partida
-    </button>
-    <p id="waiting-msg" class="text-center" style="color:#888;font-size:.9rem;display:none">
-      Aguardando o anfitrião iniciar...
-    </p>
+    <div id="setup-err" class="err"></div>
+    <button class="btn-rosa btn-full" style="margin-top:4px" onclick="createRoom()">Gerar links dos jogadores →</button>
   </div>
 </div>
 
-<!-- GAME -->
-<div id="game-screen" class="screen">
+<!-- LINKS -->
+<div id="links-screen">
+  <div class="links-card">
+    <h2 style="margin-bottom:4px">Links dos Jogadores</h2>
+    <p style="font-size:.85rem;color:#666;margin-bottom:16px">
+      Cada jogador abre o link no celular. As cartas aparecem lá em tempo real — sem precisar olhar para o lado.
+    </p>
+    <div id="player-links"></div>
+    <button class="btn-rosa btn-full" style="margin-top:16px" onclick="startGame()">Iniciar Partida →</button>
+    <button class="btn-outline btn-full" style="margin-top:8px" onclick="backToSetup()">← Voltar</button>
+  </div>
+</div>
+
+<!-- JOGO -->
+<div id="jogo">
   <div class="game-header">
     <div>
-      <div style="font-weight:900;font-size:1.1rem">Entre Linhas</div>
-      <div id="phase-display"></div>
+      <div class="titulo">Entre Linhas</div>
+      <div id="fase-display"></div>
     </div>
-    <div class="score-display" id="score-display">Pontos: 0</div>
-    <div id="timer-display" class="timer-display" style="display:none"></div>
-    <div id="pile-display" style="font-size:.8rem;color:#aaa"></div>
+    <div class="pontos" id="disp-pontos">Pontos: 0</div>
+    <div class="timer" id="disp-timer" style="display:none"></div>
+    <div style="font-size:.75rem;color:#aaa" id="disp-pilha"></div>
   </div>
 
   <div class="game-body">
-    <!-- My cards -->
-    <div class="my-cards-panel card" style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <h2>Suas Cartas</h2>
-        <span id="hand-note" style="font-size:.8rem;color:#888"></span>
-      </div>
-      <div id="my-cards" class="my-cards-grid"></div>
-      <div id="clue-area" class="clue-area" style="margin-top:12px;display:none">
-        <div class="clue-input-row">
-          <input id="clue-input" type="text" placeholder="Sua dica (uma palavra)..." maxlength="30" autocomplete="off" onkeydown="if(event.key==='Enter')submitClue()">
-          <button class="btn-primary" onclick="submitClue()">Dar Dica</button>
-        </div>
-        <div id="clue-error" class="error-msg"></div>
-      </div>
+    <!-- ESQUERDA -->
+    <div class="painel painel-left" id="painel-left">
+      <!-- Conteúdo dinâmico: dar dica / dica ativa -->
     </div>
 
-    <!-- Active clue (when someone gave a clue) -->
-    <div id="active-clue-panel" class="active-clue-panel" style="display:none">
-      <div style="font-size:.85rem;color:#aaa;margin-bottom:4px">Dica de <strong id="clue-giver-name"></strong>:</div>
-      <div class="clue-word" id="clue-word-display"></div>
-      <div class="guess-instruction" id="guess-instruction"></div>
-      <div id="confirm-row" class="confirm-row" style="display:none">
-        <div class="selected-guess">Palpite: <span id="selected-coord-display">—</span></div>
-        <button class="btn-success btn-sm" id="confirm-btn" onclick="confirmGuess()" disabled>Confirmar</button>
-      </div>
-    </div>
-
-    <!-- Grid -->
-    <div class="card" style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <h2>Tabela</h2>
-        <div id="placed-count" style="font-size:.85rem;color:#888"></div>
-      </div>
-      <div class="grid-container">
+    <!-- CENTRO -->
+    <div class="center-panel">
+      <div class="grid-wrap">
         <table class="grid-table" id="grid-table"></table>
       </div>
     </div>
 
-    <!-- Used clues -->
-    <div class="card" style="margin-bottom:16px">
-      <h2 style="margin-bottom:8px">Dicas Usadas</h2>
-      <div id="used-clues" class="used-clues-list"><span style="color:#aaa;font-size:.85rem">Nenhuma ainda</span></div>
-    </div>
-
-    <!-- Players -->
-    <div class="card">
-      <h2 style="margin-bottom:12px">Jogadores</h2>
-      <div id="game-players" class="players-list"></div>
+    <!-- DIREITA -->
+    <div class="painel painel-right">
+      <div>
+        <div class="sec-titulo">Jogadores</div>
+        <div class="player-chip-list" id="chips-jogadores"></div>
+      </div>
+      <div>
+        <div class="sec-titulo">Dicas usadas</div>
+        <div id="dicas-usadas" class="tags"><span style="color:#aaa;font-size:.8rem">Nenhuma ainda</span></div>
+      </div>
+      <div style="margin-top:auto;padding-top:8px;">
+        <button class="btn-outline btn-sm btn-full" onclick="openFim()">Ver Pontuação</button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- END -->
-<div id="end-screen" class="screen">
-  <div class="card" style="max-width:400px;width:100%;text-align:center;padding:40px 24px">
-    <h1 style="font-size:2rem;margin-bottom:16px">Fim de Jogo!</h1>
-    <div class="score-big" id="final-score">0</div>
-    <div class="score-label">cartas colocadas</div>
-    <div class="score-rating" id="score-rating"></div>
-    <div style="margin-top:24px;font-size:.9rem;color:#888" id="score-guide"></div>
-    <button class="btn-primary btn-full" style="margin-top:24px" onclick="playAgain()">Jogar Novamente</button>
-    <button class="btn-outline btn-full" style="margin-top:8px" onclick="goHome()">Início</button>
+<!-- OVERLAY RESULTADO -->
+<div id="overlay-result">
+  <div class="result-modal" id="result-modal">
+    <button class="btn-x" onclick="closeResult()">✕</button>
+    <div class="result-icon" id="result-icon"></div>
+    <div class="result-title" id="result-title"></div>
+    <div class="result-detail" id="result-detail"></div>
+    <button class="btn-escuro btn-full" onclick="closeResult()">Continuar →</button>
   </div>
 </div>
 
-<!-- Result toast -->
-<div id="result-toast" class="result-toast" style="display:none"></div>
+<!-- OVERLAY FIM -->
+<div id="overlay-fim">
+  <div class="fim-modal">
+    <button class="btn-x" onclick="document.getElementById('overlay-fim').classList.remove('vis')">✕</button>
+    <h2 style="margin-bottom:12px">Fim de Jogo!</h2>
+    <div class="pontos-big" id="fim-pts">0</div>
+    <div style="color:#888">cartas colocadas</div>
+    <div class="rating" id="fim-rating"></div>
+    <div class="rating-guia" id="fim-guia"></div>
+    <button class="btn-rosa btn-full" style="margin-top:24px" onclick="restartGame()">Jogar Novamente</button>
+    <button class="btn-outline btn-full" style="margin-top:8px" onclick="backToSetup()">Mudar Configurações</button>
+  </div>
+</div>
 
 <script>
 const socket = io();
-let myId = null;
-let state = null;
-let selectedCardCoord = null;
-let selectedGuessCoord = null;
-let resultTimer = null;
+let G = null; // game state
+let roomPlayers = []; // from roomCreated
+let activeClueForm = null; // playerIndex being filled
 
-// Colors
-const COLORS = ['av0','av1','av2','av3','av4','av5','av6','av7'];
-function avatarInitial(name) { return (name || '?')[0].toUpperCase(); }
-function avatarClass(idx) { return COLORS[idx % COLORS.length]; }
+// ── SETUP ──────────────────────────────────
+let playerNames = ['', ''];
+function renderSetupList() {
+  const el = document.getElementById('player-list');
+  el.innerHTML = playerNames.map((n, i) => `
+    <div class="player-row">
+      <input type="text" placeholder="Jogador ${i+1}" value="${esc(n)}" maxlength="20"
+             oninput="playerNames[${i}]=this.value">
+      ${i >= 2 ? `<button class="btn-del" onclick="removePlayer(${i})">✕</button>` : ''}
+    </div>
+  `).join('');
+  document.getElementById('btn-add').style.display = playerNames.length >= 8 ? 'none' : '';
+}
+function addPlayer() { if (playerNames.length < 8) { playerNames.push(''); renderSetupList(); } }
+function removePlayer(i) { playerNames.splice(i, 1); renderSetupList(); }
+renderSetupList();
 
-// Screens
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
-
-// Home
-function showCreateRoom() {
-  const name = document.getElementById('player-name').value.trim();
-  if (!name) { document.getElementById('home-error').textContent = 'Digite seu nome primeiro.'; return; }
-  document.getElementById('home-error').textContent = '';
-  document.getElementById('create-overlay').style.display = 'flex';
-}
-function closeCreateOverlay() {
-  document.getElementById('create-overlay').style.display = 'none';
-}
 function createRoom() {
-  const name = document.getElementById('player-name').value.trim();
-  const gridSize = parseInt(document.getElementById('create-grid-size').value);
-  const useTimer = document.getElementById('create-timer').checked;
-  socket.emit('createRoom', { name, gridSize, useTimer });
-  closeCreateOverlay();
-}
-function joinRoom() {
-  const name = document.getElementById('player-name').value.trim();
-  const code = document.getElementById('join-code').value.trim().toUpperCase();
-  if (!name) { document.getElementById('home-error').textContent = 'Digite seu nome.'; return; }
-  if (!code) { document.getElementById('home-error').textContent = 'Digite o código da sala.'; return; }
-  socket.emit('joinRoom', { name, code });
+  document.querySelectorAll('#player-list input').forEach((inp, i) => { playerNames[i] = inp.value.trim(); });
+  const names = playerNames.filter(n => n);
+  const err = document.getElementById('setup-err');
+  if (names.length < 2) { err.textContent = 'Adicione pelo menos 2 jogadores.'; return; }
+  err.textContent = '';
+  const gridSize = parseInt(document.getElementById('gridSize').value);
+  const cronoMin = parseInt(document.getElementById('crono').value);
+  socket.emit('setupGame', { names, gridSize, cronoMin });
 }
 
-document.getElementById('join-code').addEventListener('input', e => {
-  e.target.value = e.target.value.toUpperCase();
+function backToSetup() {
+  document.getElementById('links-screen').classList.remove('active');
+  document.getElementById('jogo').classList.remove('active');
+  document.getElementById('setup').classList.remove('hidden');
+  document.getElementById('overlay-fim').classList.remove('vis');
+  G = null;
+}
+
+// ── LINKS ──────────────────────────────────
+socket.on('roomCreated', ({ players }) => {
+  roomPlayers = players;
+  const el = document.getElementById('player-links');
+  el.innerHTML = players.map((p, i) => `
+    <div class="player-link-item">
+      <div class="dot" id="dot-${i}"></div>
+      <div class="link-name">${esc(p.name)}</div>
+      <div class="link-url">${esc(p.url)}</div>
+      <button class="btn-copy" onclick="copyLink('${esc(p.url)}', this)">Copiar</button>
+    </div>
+  `).join('');
+  document.getElementById('setup').classList.add('hidden');
+  document.getElementById('links-screen').classList.add('active');
 });
 
-// Lobby
-function copyCode() {
-  const code = document.getElementById('lobby-code').textContent;
-  navigator.clipboard.writeText(code).then(() => showToast('Código copiado!', true));
-}
-function updateSettings() {
-  const gridSize = parseInt(document.getElementById('lobby-grid-size').value);
-  const useTimer = document.getElementById('lobby-timer').checked;
-  socket.emit('updateSettings', { gridSize, useTimer });
-}
-function startGame() { socket.emit('startGame'); }
-
-// Game
-function selectCard(coord) {
-  if (state.phase !== 'thinking') return;
-  if (state.currentClue) return;
-  selectedCardCoord = coord;
-  renderMyCards();
-  document.getElementById('clue-area').style.display = 'block';
-  document.getElementById('clue-input').focus();
-}
-function submitClue() {
-  const clue = document.getElementById('clue-input').value.trim();
-  document.getElementById('clue-error').textContent = '';
-  if (!clue) { document.getElementById('clue-error').textContent = 'Digite uma dica.'; return; }
-  if (clue.includes(' ')) { document.getElementById('clue-error').textContent = 'Apenas uma palavra.'; return; }
-  if (!selectedCardCoord) { document.getElementById('clue-error').textContent = 'Selecione uma carta.'; return; }
-  socket.emit('submitClue', { clue, cardCoord: selectedCardCoord });
-  document.getElementById('clue-input').value = '';
+function copyLink(url, btn) {
+  navigator.clipboard.writeText(url).then(() => {
+    btn.textContent = 'Copiado!';
+    setTimeout(() => btn.textContent = 'Copiar', 1500);
+  });
 }
 
-function selectGuessCoord(coord) {
-  if (!state.currentClue) return;
-  if (state.currentClue.playerId === myId) return; // clue giver can't guess
-  selectedGuessCoord = coord;
-  socket.emit('setGroupGuess', { coord });
-}
-function confirmGuess() {
-  if (!selectedGuessCoord) return;
-  socket.emit('confirmGuess');
+function startGame() {
+  socket.emit('startGame');
+  document.getElementById('links-screen').classList.remove('active');
+  document.getElementById('jogo').classList.add('active');
+  computeCellSize();
 }
 
-function playAgain() {
-  if (!state) return;
-  showScreen('lobby-screen');
-  renderLobby(state);
-}
-function goHome() { showScreen('home-screen'); state = null; }
-
-// Format timer
-function fmtTime(s) {
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return `${m}:${sec.toString().padStart(2,'0')}`;
-}
-
-// Score rating
-function scoreRating(score, gridSize) {
-  const thresholds = {
-    3: [{max: 3, label:'Fracasso 😬', desc:'< 4'}, {max: 5, label:'Mediano 🤔', desc:'4–5'}, {max: 7, label:'Bom! 💪', desc:'6–7'}, {max: Infinity, label:'Espetacular! 🤯', desc:'8+'}],
-    4: [{max: 7, label:'Fracasso 😬', desc:'< 8'}, {max: 11, label:'Mediano 🤔', desc:'8–11'}, {max: 14, label:'Bom! 💪', desc:'12–14'}, {max: Infinity, label:'Espetacular! 🤯', desc:'15+'}],
-    5: [{max: 11, label:'Fracasso 😬', desc:'< 12'}, {max: 16, label:'Mediano 🤔', desc:'12–16'}, {max: 22, label:'Bom! 💪', desc:'17–22'}, {max: Infinity, label:'Espetacular! 🤯', desc:'23+'}],
-  };
-  const t = thresholds[gridSize] || thresholds[4];
-  return t.find(r => score <= r.max);
-}
-
-// Render
-function render(s) {
-  state = s;
-  if (s.phase === 'lobby') renderLobby(s);
-  else if (s.phase === 'ended') renderEnd(s);
-  else renderGame(s);
-}
-
-function renderLobby(s) {
-  showScreen('lobby-screen');
-  document.getElementById('lobby-code').textContent = s.code;
-  const isHost = s.host === myId;
-
-  // Players
-  const pl = document.getElementById('lobby-players');
-  pl.innerHTML = s.players.map((p, i) => `
-    <div class="player-item">
-      <div class="player-avatar ${avatarClass(i)}">${avatarInitial(p.name)}</div>
-      <div class="player-name">${esc(p.name)}</div>
-      ${p.id === s.host ? '<span class="badge badge-host">anfitrião</span>' : ''}
-      ${p.id === myId ? '<span class="badge badge-you">você</span>' : ''}
-      ${!p.online ? '<span class="badge badge-offline">offline</span>' : ''}
-    </div>
-  `).join('');
-
-  // Settings
-  document.getElementById('lobby-settings').style.display = isHost ? 'block' : 'none';
-  document.getElementById('lobby-info').style.display = isHost ? 'none' : 'block';
-  if (isHost) {
-    document.getElementById('lobby-grid-size').value = s.gridSize;
-    document.getElementById('lobby-timer').checked = s.useTimer;
-  } else {
-    const sizes = {3:'Expresso 3×3', 4:'Clássico 4×4', 5:'Expert 5×5'};
-    document.getElementById('lobby-settings-info').textContent =
-      `Modo: ${sizes[s.gridSize]} | Cronômetro: ${s.useTimer ? 'Sim' : 'Não'}`;
+// ── GAME STATE ─────────────────────────────
+socket.on('gameState', (state) => {
+  G = state;
+  renderGame();
+  if (state.phase === 'ended') openFim();
+  // Update connection dots on links screen
+  if (state.players) {
+    state.players.forEach((p, i) => {
+      const dot = document.getElementById(`dot-${i}`);
+      if (dot) dot.classList.toggle('on', p.connected);
+    });
   }
+});
 
-  document.getElementById('start-btn').style.display = isHost ? 'block' : 'none';
-  document.getElementById('waiting-msg').style.display = isHost ? 'none' : 'block';
-  document.getElementById('lobby-error').textContent = '';
-}
-
-function renderGame(s) {
-  showScreen('game-screen');
-  const isClueGiver = s.currentClue && s.currentClue.playerId === myId;
+function renderGame() {
+  if (!G) return;
 
   // Header
-  document.getElementById('score-display').textContent = `Pontos: ${s.score}`;
-  document.getElementById('pile-display').textContent = `Pilha: ${s.pileCount}`;
+  document.getElementById('disp-pontos').textContent = `Pontos: ${G.score}`;
+  document.getElementById('disp-pilha').textContent = `Pilha: ${G.pileCount}`;
 
-  const phaseEl = document.getElementById('phase-display');
-  if (s.phase === 'thinking') {
-    phaseEl.innerHTML = '<span class="phase-badge phase-thinking">Pensando...</span>';
-  } else {
-    phaseEl.innerHTML = '<span class="phase-badge phase-guessing">Adivinhando!</span>';
-  }
+  const fase = document.getElementById('fase-display');
+  fase.innerHTML = G.phase === 'thinking'
+    ? '<span class="fase-badge fase-p">Pensando...</span>'
+    : '<span class="fase-badge fase-a">Adivinhando!</span>';
 
-  const timerEl = document.getElementById('timer-display');
-  if (s.timeLeft !== null && s.timeLeft !== undefined) {
-    timerEl.style.display = 'block';
-    timerEl.textContent = fmtTime(s.timeLeft);
-    timerEl.className = 'timer-display' + (s.timeLeft <= 30 ? ' urgent' : '');
-  } else {
-    timerEl.style.display = 'none';
-  }
-
-  // My cards
-  renderMyCards(s);
-
-  // Clue area
-  const clueArea = document.getElementById('clue-area');
-  if (s.phase === 'thinking' && s.myCards && s.myCards.length > 0) {
-    clueArea.style.display = selectedCardCoord ? 'block' : 'none';
-  } else {
-    clueArea.style.display = 'none';
-  }
-
-  // Active clue panel
-  const acp = document.getElementById('active-clue-panel');
-  if (s.currentClue) {
-    acp.style.display = 'block';
-    document.getElementById('clue-giver-name').textContent = s.currentClue.playerName;
-    document.getElementById('clue-word-display').textContent = s.currentClue.clue;
-
-    const instrEl = document.getElementById('guess-instruction');
-    const confirmRow = document.getElementById('confirm-row');
-    if (isClueGiver) {
-      instrEl.textContent = 'Você deu a dica. Aguardando os outros adivinharem...';
-      confirmRow.style.display = 'none';
-    } else {
-      instrEl.textContent = 'Clique em uma célula da tabela para selecionar o palpite do grupo.';
-      confirmRow.style.display = 'flex';
-      selectedGuessCoord = s.groupGuess || null;
-      const coordDisp = document.getElementById('selected-coord-display');
-      coordDisp.textContent = selectedGuessCoord || '—';
-      document.getElementById('confirm-btn').disabled = !selectedGuessCoord;
-    }
-  } else {
-    acp.style.display = 'none';
-  }
+  const timerEl = document.getElementById('disp-timer');
+  if (G.timeLeft !== null && G.timeLeft !== undefined) {
+    timerEl.style.display = '';
+    const m = Math.floor(G.timeLeft / 60), s = G.timeLeft % 60;
+    timerEl.textContent = `⏱ ${m}:${s.toString().padStart(2,'0')}`;
+    timerEl.className = 'timer' + (G.timeLeft <= 30 ? ' urgente' : '');
+  } else timerEl.style.display = 'none';
 
   // Grid
-  renderGrid(s);
+  renderGrid();
 
-  // Placed count
-  document.getElementById('placed-count').textContent =
-    `${Object.keys(s.placed).length} / ${s.gridSize * s.gridSize}`;
+  // Painel esquerdo
+  renderLeft();
 
-  // Used clues
-  const uc = document.getElementById('used-clues');
-  if (s.usedClues && s.usedClues.length > 0) {
-    uc.innerHTML = s.usedClues.map(c => `<span class="used-clue-tag">${esc(c)}</span>`).join('');
-  } else {
-    uc.innerHTML = '<span style="color:#aaa;font-size:.85rem">Nenhuma ainda</span>';
-  }
-
-  // Players
-  const gp = document.getElementById('game-players');
-  gp.innerHTML = s.players.map((p, i) => `
-    <div class="player-item">
-      <div class="player-avatar ${avatarClass(i)}">${avatarInitial(p.name)}</div>
-      <div class="player-name">${esc(p.name)}</div>
-      <span style="font-size:.8rem;color:#888">${p.cardCount} carta(s)</span>
-      ${p.id === myId ? '<span class="badge badge-you">você</span>' : ''}
-      ${s.currentClue && s.currentClue.playerId === p.id ? '<span class="badge" style="background:#f5c842;color:#7a5900">💬 dando dica</span>' : ''}
-      ${!p.online ? '<span class="badge badge-offline">offline</span>' : ''}
-    </div>
-  `).join('');
-
-  // Last result toast
-  if (s.lastResult && !resultTimer) {
-    showResultToast(s.lastResult);
-  }
+  // Painel direito
+  renderRight();
 }
 
-function renderMyCards(s) {
-  s = s || state;
-  if (!s) return;
-  const myCards = s.myCards || [];
-  const handNote = document.getElementById('hand-note');
+function renderGrid() {
+  const t = document.getElementById('grid-table');
+  if (!G.letters || !G.letters.length) { t.innerHTML = ''; return; }
 
-  if (myCards.length === 0) {
-    document.getElementById('my-cards').innerHTML = '<span style="color:#aaa;font-size:.9rem">Sem cartas na mão.</span>';
-    handNote.textContent = '';
-    return;
-  }
-  if (myCards.length > 1) {
-    handNote.textContent = 'Escolha qual carta usar';
-  } else {
-    handNote.textContent = '';
-  }
-
-  const grid = s.grid || {};
-  const isGuessing = s.phase === 'guessing';
-
-  document.getElementById('my-cards').innerHTML = myCards.map(coord => {
-    const letter = coord[0];
-    const num = parseInt(coord[1]);
-    const rowWord = (grid.rows || {})[letter] || '?';
-    const colWord = (grid.cols || {})[num] || '?';
-    const isSel = selectedCardCoord === coord;
-    const disabled = isGuessing || s.phase !== 'thinking';
-    return `
-      <div class="my-card ${isSel ? 'selected-card' : ''} ${disabled ? 'used' : ''}"
-           onclick="${disabled ? '' : `selectCard('${coord}')`}">
-        <div class="card-coord-big">${coord}</div>
-        <div class="card-words">
-          <span class="card-word">${esc(rowWord)}</span>
-          <span style="color:#aaa"> × </span>
-          <span class="card-word">${esc(colWord)}</span>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-function renderGrid(s) {
-  const grid = s.grid;
-  if (!grid) return;
-  const table = document.getElementById('grid-table');
-  const isClueGiver = s.currentClue && s.currentClue.playerId === myId;
-  const isGuessing = s.phase === 'guessing';
-  const myCards = s.myCards || [];
-
-  let html = '<thead><tr><th></th>';
-  grid.numbers.forEach(n => {
-    html += `<th><div class="axis-cell"><div class="axis-number">${n}</div><div style="font-size:.65rem;margin-top:2px">${esc(grid.cols[n])}</div></div></th>`;
+  let html = '<thead><tr><td></td>';
+  G.numbers.forEach(n => {
+    html += `<td><div class="ax"><div class="ax-l">${n}</div><div class="ax-w">${esc(G.cols[n])}</div></div></td>`;
   });
   html += '</tr></thead><tbody>';
 
-  grid.letters.forEach(l => {
-    html += `<tr><td><div class="axis-cell"><div class="axis-letter">${l}</div><div style="font-size:.65rem;margin-top:2px">${esc(grid.rows[l])}</div></div></td>`;
-    grid.numbers.forEach(n => {
+  G.letters.forEach(l => {
+    html += `<tr><td><div class="ax"><div class="ax-l">${l}</div><div class="ax-w">${esc(G.rows[l])}</div></div></td>`;
+    G.numbers.forEach(n => {
       const coord = `${l}${n}`;
-      const placed = s.placed[coord];
-      const isMyCard = myCards.includes(coord);
-      const isGroupGuess = selectedGuessCoord === coord;
-      const isLastWrong = s.lastResult && !s.lastResult.correct && s.lastResult.guess === coord;
+      const placed = G.placed[coord];
+      const adivinhando = G.phase === 'guessing';
+      const sel = G.groupGuess === coord;
 
-      let cellClass = 'grid-cell';
-      if (placed) cellClass += ' placed';
-      else if (isMyCard && s.phase === 'thinking') cellClass += ' clue-giver-card';
-      else if (isLastWrong) cellClass += ' wrong-guess';
-      if (isGroupGuess && isGuessing && !isClueGiver) cellClass += ' selected';
-      if (isClueGiver || placed || s.phase === 'thinking') cellClass += ' disabled';
+      let cls = 'cell';
+      if (placed) cls += ' colocada';
+      else if (sel) cls += ' sel';
+      if (!adivinhando || placed) cls += ' off';
 
-      const clickable = isGuessing && !isClueGiver && !placed;
-      const onclick = clickable ? `selectGuessCoord('${coord}')` : '';
+      const click = adivinhando && !placed ? `selectGuess('${coord}')` : '';
+      const inner = placed
+        ? `<div class="cell-dica">✓ ${esc(placed.clue)}</div>`
+        : `<div class="cell-coord">${coord}</div>`;
 
-      let inner = `<div class="cell-coord">${coord}</div>`;
-      if (placed) {
-        inner = `<div class="cell-tick">✓</div><div class="cell-clue">${esc(placed.clue)}</div>`;
-      }
-
-      html += `<td><div class="${cellClass}" onclick="${onclick}">${inner}</div></td>`;
+      html += `<td><div class="${cls}" onclick="${click}">${inner}</div></td>`;
     });
     html += '</tr>';
   });
   html += '</tbody>';
-  table.innerHTML = html;
+  t.innerHTML = html;
 }
 
-function renderEnd(s) {
-  showScreen('end-screen');
-  document.getElementById('final-score').textContent = s.score;
-  const rating = scoreRating(s.score, s.gridSize);
-  if (rating) {
-    document.getElementById('score-rating').textContent = rating.label;
-    const guides = {3:'Espetacular: 8+ | Bom: 6-7 | Mediano: 4-5', 4:'Espetacular: 15+ | Bom: 12-14 | Mediano: 8-11', 5:'Espetacular: 23+ | Bom: 17-22 | Mediano: 12-16'};
-    document.getElementById('score-guide').textContent = guides[s.gridSize] || '';
+function renderLeft() {
+  const el = document.getElementById('painel-left');
+  if (!G) { el.innerHTML = ''; return; }
+
+  if (G.phase === 'guessing' && G.currentClue) {
+    const p = G.currentClue;
+    el.innerHTML = `
+      <div>
+        <div class="sec-titulo">Dica em jogo</div>
+        <div class="dica-ativa-panel">
+          <div class="dica-ativa-de">Dica de <strong>${esc(p.playerName)}</strong>:</div>
+          <div class="dica-palavra">${esc(p.clue)}</div>
+          <div class="palpite-info">
+            Clique na tabela para selecionar.<br>
+            Palpite: <span class="palpite-coord">${G.groupGuess || '—'}</span>
+          </div>
+          <div class="confirmar-row">
+            <button class="btn-verde btn-sm" onclick="confirmGuess()" ${G.groupGuess ? '' : 'disabled'}>
+              Confirmar ✓
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  // Thinking phase
+  const playersWithCards = G.players.filter(p => p.cardCount > 0);
+  let html = `<div><div class="sec-titulo">Quem vai dar dica?</div><div class="dar-dica-list">`;
+
+  playersWithCards.forEach(p => {
+    const avCls = `av${p.index % 8}`;
+    html += `
+      <button class="dar-dica-btn" onclick="openClueForm(${p.index})">
+        <div class="av ${avCls}">${p.name[0].toUpperCase()}</div>
+        <div class="nome">${esc(p.name)}</div>
+        <div class="cartas">${p.cardCount} carta(s)</div>
+      </button>
+    `;
+  });
+
+  if (!playersWithCards.length) {
+    html += `<span style="font-size:.85rem;color:#aaa">Nenhum jogador com cartas.</span>`;
+  }
+
+  html += `</div></div>`;
+
+  // Formulário inline de dica
+  if (activeClueForm !== null) {
+    const p = G.players.find(pl => pl.index === activeClueForm);
+    const name = p ? p.name : '';
+    html += `
+      <div class="clue-form" id="clue-form">
+        <button class="btn-x" onclick="closeClueForm()">✕</button>
+        <div class="form-titulo">Dica de ${esc(name)}</div>
+        <div class="cfg-label" style="margin-bottom:4px">Carta a usar:</div>
+        <select id="coord-select" style="margin-bottom:8px"></select>
+        <div class="cfg-label" style="margin-bottom:4px">Palavra (uma só):</div>
+        <input id="clue-input" type="text" placeholder="Sua dica..." maxlength="30"
+               autocomplete="off" onkeydown="if(event.key==='Enter')sendClue()">
+        <div id="clue-err" class="err"></div>
+        <div class="actions" style="margin-top:8px">
+          <button class="btn-rosa btn-sm" onclick="sendClue()">Revelar dica →</button>
+        </div>
+      </div>
+    `;
+  }
+
+  el.innerHTML = html;
+
+  // Populate card select if form open
+  if (activeClueForm !== null) {
+    // We need card data - but publicState only has cardCount, not coords
+    // We store it in pendingCards
+    const sel = document.getElementById('coord-select');
+    if (sel && pendingCards[activeClueForm]) {
+      pendingCards[activeClueForm].forEach(card => {
+        const opt = document.createElement('option');
+        opt.value = card.coord;
+        opt.textContent = `${card.coord} — ${card.rowWord} × ${card.colWord}`;
+        sel.appendChild(opt);
+      });
+    }
+    setTimeout(() => document.getElementById('clue-input')?.focus(), 50);
   }
 }
 
-function showToast(msg, success) {
-  const t = document.getElementById('result-toast');
-  t.textContent = msg;
-  t.className = 'result-toast ' + (success ? 'correct' : 'wrong');
-  t.style.display = 'block';
-  clearTimeout(resultTimer);
-  resultTimer = setTimeout(() => { t.style.display = 'none'; resultTimer = null; }, 2500);
-}
+function renderRight() {
+  // Players
+  const chips = document.getElementById('chips-jogadores');
+  if (!G || !G.players) return;
+  chips.innerHTML = G.players.map(p => `
+    <div class="player-chip">
+      <div class="av ${`av${p.index % 8}`}">${p.name[0].toUpperCase()}</div>
+      <div class="pn">${esc(p.name)}</div>
+      <span class="pc">${p.cardCount}✉</span>
+      <div class="dot ${p.connected ? 'on' : ''}"></div>
+    </div>
+  `).join('');
 
-function showResultToast(result) {
-  if (result.correct) {
-    showToast(`✓ Correto! "${esc(result.clue)}" → ${result.coord}`, true);
+  // Used clues
+  const uc = document.getElementById('dicas-usadas');
+  if (G.usedClues && G.usedClues.length > 0) {
+    uc.innerHTML = G.usedClues.map(c => `<span class="tag">${esc(c)}</span>`).join('');
   } else {
-    showToast(`✗ Errado! Era ${result.coord}, palpite foi ${result.guess}`, false);
+    uc.innerHTML = '<span style="color:#aaa;font-size:.8rem">Nenhuma ainda</span>';
   }
 }
+
+// ── CLUE FORM ──────────────────────────────
+// Store card data for each player (received separately)
+const pendingCards = {};
+
+function openClueForm(playerIndex) {
+  activeClueForm = playerIndex;
+  renderLeft();
+}
+function closeClueForm() {
+  activeClueForm = null;
+  renderLeft();
+}
+
+socket.on('playerCards', ({ playerIndex, cards }) => {
+  pendingCards[playerIndex] = cards;
+  if (activeClueForm === playerIndex) renderLeft();
+});
+
+// When host clicks dar dica and player has no phone, request their cards
+function openClueForm(playerIndex) {
+  activeClueForm = playerIndex;
+  socket.emit('requestPlayerCards', { playerIndex });
+  renderLeft();
+}
+
+socket.on('playerCardsForHost', ({ playerIndex, cards }) => {
+  pendingCards[playerIndex] = cards;
+  renderLeft();
+});
+
+function sendClue() {
+  const sel = document.getElementById('coord-select');
+  const inp = document.getElementById('clue-input');
+  const errEl = document.getElementById('clue-err');
+  if (!sel || !inp) return;
+  const coord = sel.value;
+  const clue = inp.value.trim();
+  if (!coord) { errEl.textContent = 'Selecione uma carta.'; return; }
+  if (!clue) { errEl.textContent = 'Digite uma dica.'; return; }
+  if (clue.includes(' ')) { errEl.textContent = 'Uma única palavra.'; return; }
+  errEl.textContent = '';
+  socket.emit('submitClue', { clue, coord, playerIndex: activeClueForm });
+  activeClueForm = null;
+}
+
+socket.on('clueError', (msg) => {
+  const el = document.getElementById('clue-err');
+  if (el) el.textContent = msg;
+});
+
+// ── GUESS ──────────────────────────────────
+function selectGuess(coord) {
+  socket.emit('setGroupGuess', { coord });
+}
+function confirmGuess() {
+  socket.emit('confirmGuess');
+}
+
+// ── RESULT ─────────────────────────────────
+socket.on('gameState', (state) => {
+  if (state.lastResult) showResult(state.lastResult);
+});
+
+function showResult(r) {
+  const modal = document.getElementById('result-modal');
+  modal.className = 'result-modal ' + (r.correct ? 'ok' : 'err');
+  document.getElementById('result-icon').textContent = r.correct ? '🎉' : '😬';
+  document.getElementById('result-title').textContent = r.correct ? 'Acertaram!' : 'Erraram!';
+  document.getElementById('result-detail').textContent = r.correct
+    ? `"${r.clue}" estava na posição ${r.coord}. +1 ponto!`
+    : `Vocês disseram ${r.guess}, mas a carta era ${r.coord}. Carta descartada.`;
+  document.getElementById('overlay-result').classList.add('vis');
+}
+function closeResult() {
+  document.getElementById('overlay-result').classList.remove('vis');
+}
+
+// ── FIM ────────────────────────────────────
+function openFim() {
+  if (!G) return;
+  const pts = G.score, size = G.gridSize;
+  document.getElementById('fim-pts').textContent = pts;
+  const ratings = {
+    3:[{m:3,l:'Fracasso 😬'},{m:5,l:'Mediano 🤔'},{m:7,l:'Bom! 💪'},{m:99,l:'Espetacular! 🤯'}],
+    4:[{m:7,l:'Fracasso 😬'},{m:11,l:'Mediano 🤔'},{m:14,l:'Bom! 💪'},{m:99,l:'Espetacular! 🤯'}],
+    5:[{m:11,l:'Fracasso 😬'},{m:16,l:'Mediano 🤔'},{m:22,l:'Bom! 💪'},{m:99,l:'Espetacular! 🤯'}],
+  };
+  const guias = {3:'Espetacular:8+ | Bom:6-7 | Mediano:4-5',4:'Espetacular:15+ | Bom:12-14 | Mediano:8-11',5:'Espetacular:23+ | Bom:17-22 | Mediano:12-16'};
+  const r = (ratings[size]||ratings[4]).find(x => pts <= x.m);
+  document.getElementById('fim-rating').textContent = r ? r.l : '';
+  document.getElementById('fim-guia').textContent = guias[size]||'';
+  document.getElementById('overlay-fim').classList.add('vis');
+}
+function restartGame() {
+  document.getElementById('overlay-fim').classList.remove('vis');
+  socket.emit('startGame');
+  document.getElementById('jogo').classList.add('active');
+}
+
+// ── CELL SIZE ──────────────────────────────
+function computeCellSize() {
+  const leftW = 270, rightW = 250, headerH = 52, pad = 24, axisW = 70, axisH = 70;
+  const availW = window.innerWidth - leftW - rightW - pad * 2 - axisW;
+  const availH = window.innerHeight - headerH - pad * 2 - axisH;
+  const gridSize = G ? G.gridSize : 4;
+  const cell = Math.floor(Math.min(availW / gridSize, availH / gridSize, 110));
+  document.documentElement.style.setProperty('--cell', `${Math.max(cell, 52)}px`);
+}
+window.addEventListener('resize', computeCellSize);
 
 function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-
-// Socket events
-socket.on('connect', () => { myId = socket.id; });
-
-socket.on('state', (s) => {
-  selectedGuessCoord = s.groupGuess || null;
-  // Reset selected card if no longer in hand
-  if (selectedCardCoord && s.myCards && !s.myCards.includes(selectedCardCoord)) {
-    selectedCardCoord = null;
-  }
-  render(s);
-});
-
-socket.on('error', (msg) => {
-  const homeErr = document.getElementById('home-error');
-  const lobbyErr = document.getElementById('lobby-error');
-  const clueErr = document.getElementById('clue-error');
-  if (document.getElementById('home-screen').classList.contains('active')) {
-    homeErr.textContent = msg;
-  } else if (document.getElementById('lobby-screen').classList.contains('active')) {
-    lobbyErr.textContent = msg;
-  } else {
-    clueErr.textContent = msg;
-  }
-});
 </script>
 </body>
 </html>

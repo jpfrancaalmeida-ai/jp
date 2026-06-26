@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entre Linhas — Minha Mão</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{--rosa:#c94070;--verde:#2e9e5b;--escuro:#2a1a0e;--amarelo:#f5c842;}
+body{
+  font-family:'Segoe UI',system-ui,sans-serif;
+  background:#f5f0e8;color:var(--escuro);
+  min-height:100dvh;display:flex;flex-direction:column;
+}
+
+.topo{
+  background:var(--escuro);color:#fff;padding:14px 18px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.topo-nome{font-weight:900;font-size:1.1rem;}
+.topo-status{font-size:.78rem;color:#aaa;}
+
+.corpo{flex:1;padding:16px;display:flex;flex-direction:column;gap:14px;}
+
+/* Estado */
+.estado-panel{
+  border-radius:12px;padding:14px;text-align:center;
+}
+.estado-pensando{background:#e8f5ee;border:2px solid var(--verde);}
+.estado-adivinhando{background:#fff3f6;border:2px solid var(--rosa);}
+.estado-title{font-weight:700;font-size:.95rem;}
+.estado-dica{font-size:1.5rem;font-weight:900;color:var(--rosa);margin-top:6px;word-break:break-word;}
+.estado-de{font-size:.78rem;color:#888;margin-top:4px;}
+
+/* Cartas */
+.cartas-titulo{font-size:.75rem;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.4px;}
+.carta{
+  background:#fff;border-radius:14px;padding:18px;
+  box-shadow:0 2px 12px rgba(0,0,0,.08);
+  border:2px solid #e0d8cc;
+}
+.carta.selecionada{border-color:var(--rosa);box-shadow:0 0 0 3px rgba(201,64,112,.2);}
+.carta-coord{font-size:2rem;font-weight:900;color:var(--rosa);line-height:1;}
+.carta-palavras{margin-top:8px;font-size:1rem;color:#444;}
+.carta-palavras strong{color:var(--escuro);font-size:1.05rem;}
+.sep{color:#bbb;margin:0 4px;}
+
+/* Dar dica */
+.dar-dica-section{display:flex;flex-direction:column;gap:8px;}
+.dar-dica-section label{font-size:.82rem;font-weight:600;color:#555;}
+.dica-row{display:flex;gap:8px;}
+.dica-row input{
+  flex:1;padding:12px 14px;border:2px solid #ddd;border-radius:10px;
+  font-size:1rem;outline:none;
+}
+.dica-row input:focus{border-color:var(--rosa);}
+button{
+  padding:12px 18px;border:none;border-radius:10px;
+  font-size:.9rem;font-weight:700;cursor:pointer;
+}
+.btn-rosa{background:var(--rosa);color:#fff;}
+.btn-verde{background:var(--verde);color:#fff;}
+.btn-outline{background:transparent;border:2px solid var(--rosa);color:var(--rosa);}
+.btn-full{width:100%;}
+button:disabled{opacity:.4;cursor:default;}
+.err{color:#c00;font-size:.82rem;font-weight:600;margin-top:4px;}
+
+/* Pedir carta */
+.pedir-section{text-align:center;padding:4px 0;}
+.pedir-info{font-size:.8rem;color:#888;margin-top:6px;}
+
+/* Overlay: selecionar carta */
+#overlay-sel{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+  z-index:50;align-items:center;justify-content:center;padding:20px;
+}
+#overlay-sel.vis{display:flex;}
+.sel-modal{
+  background:#fff;border-radius:16px;padding:24px;
+  max-width:340px;width:100%;position:relative;
+}
+.sel-modal h3{margin-bottom:14px;}
+.sel-card-btn{
+  width:100%;background:#f9f9f9;border:2px solid #ddd;border-radius:10px;
+  padding:14px;margin-bottom:8px;cursor:pointer;text-align:left;
+  display:flex;flex-direction:column;gap:4px;
+}
+.sel-card-btn:hover{border-color:var(--rosa);}
+.sel-coord{font-size:1.3rem;font-weight:900;color:var(--rosa);}
+.sel-palavras{font-size:.88rem;color:#444;}
+.btn-x{
+  position:absolute;top:12px;right:12px;
+  background:transparent;border:none;color:#999;
+  font-size:1.2rem;cursor:pointer;
+}
+
+/* Sem jogo */
+.sem-jogo{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:12px;text-align:center;padding:24px;
+}
+.sem-jogo h2{font-size:1.2rem;}
+.sem-jogo p{font-size:.9rem;color:#888;}
+
+/* Aguardando início */
+.aguardando{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:10px;text-align:center;padding:24px;
+}
+.spinner{width:36px;height:36px;border:3px solid #ddd;border-top-color:var(--rosa);border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<div id="sem-jogo" class="sem-jogo">
+  <h2>Entre Linhas</h2>
+  <p>Aguardando conexão...</p>
+  <div class="spinner"></div>
+  <div id="player-err" style="color:#c00;font-size:.85rem;"></div>
+</div>
+
+<div id="aguardando" class="aguardando" style="display:none">
+  <div class="spinner"></div>
+  <h2 id="agt-nome"></h2>
+  <p>Aguardando o jogo começar...</p>
+</div>
+
+<div id="jogo-tela" style="display:none;flex:1;flex-direction:column;">
+  <div class="topo">
+    <div>
+      <div class="topo-nome" id="topo-nome">Jogador</div>
+      <div class="topo-status" id="topo-status">Pensando...</div>
+    </div>
+    <div id="topo-pontos" style="font-weight:700;color:var(--amarelo);"></div>
+  </div>
+
+  <div class="corpo">
+    <!-- Estado atual do jogo -->
+    <div id="estado-panel" style="display:none"></div>
+
+    <!-- Minhas cartas -->
+    <div class="cartas-titulo">Minhas Cartas</div>
+    <div id="minhas-cartas"></div>
+
+    <!-- Dar dica (aparece quando selecionou carta) -->
+    <div id="dar-dica-section" style="display:none" class="dar-dica-section">
+      <label>Palavra que conecta as duas (uma só):</label>
+      <div class="dica-row">
+        <input id="dica-input" type="text" placeholder="Sua dica..." maxlength="30"
+               autocomplete="off" autocorrect="off" spellcheck="false"
+               onkeydown="if(event.key==='Enter')enviarDica()">
+        <button class="btn-rosa" onclick="enviarDica()">→</button>
+      </div>
+      <div id="dica-err" class="err"></div>
+      <button class="btn-outline btn-full" style="margin-top:4px" onclick="cancelarDica()">Cancelar</button>
+    </div>
+
+    <!-- Pedir mais carta -->
+    <div id="pedir-section" class="pedir-section" style="display:none">
+      <button class="btn-outline btn-full" onclick="pedirCarta()">Pedir 2ª carta</button>
+      <div class="pedir-info">Você tem 1 carta. Pode pedir mais uma (máx. 2).</div>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay: escolher qual carta usar quando tem 2 -->
+<div id="overlay-sel">
+  <div class="sel-modal">
+    <button class="btn-x" onclick="fecharOverlaySel()">✕</button>
+    <h3>Qual carta usar?</h3>
+    <div id="sel-cartas"></div>
+  </div>
+</div>
+
+<script>
+const socket = io();
+const token = location.pathname.split('/p/')[1];
+let myState = null;
+let cartaSelecionada = null;
+
+socket.on('connect', () => {
+  socket.emit('playerConnect', { token });
+});
+
+socket.on('playerError', (msg) => {
+  document.getElementById('player-err').textContent = msg;
+});
+
+socket.on('myState', (state) => {
+  myState = state;
+  render();
+});
+
+function render() {
+  if (!myState) return;
+
+  document.getElementById('sem-jogo').style.display = 'none';
+
+  if (myState.phase === 'lobby') {
+    document.getElementById('aguardando').style.display = 'flex';
+    document.getElementById('jogo-tela').style.display = 'none';
+    document.getElementById('agt-nome').textContent = myState.name;
+    return;
+  }
+
+  document.getElementById('aguardando').style.display = 'none';
+  document.getElementById('jogo-tela').style.display = 'flex';
+
+  // Topo
+  document.getElementById('topo-nome').textContent = myState.name;
+  const status = myState.isGiving ? '💬 Você está dando a dica!' :
+    myState.phase === 'guessing' ? '🤔 Grupo adivinhando...' : '🧠 Pensando...';
+  document.getElementById('topo-status').textContent = status;
+  if (myState.score !== undefined) {
+    document.getElementById('topo-pontos').textContent = `${myState.score} pts`;
+  }
+
+  // Estado atual
+  const estadoEl = document.getElementById('estado-panel');
+  if (myState.phase === 'guessing' && myState.currentClue) {
+    const c = myState.currentClue;
+    const isMinha = c.playerIndex === myState.playerIndex;
+    if (isMinha) {
+      estadoEl.className = 'estado-panel estado-adivinhando';
+      estadoEl.innerHTML = `<div class="estado-title">Você deu a dica:</div><div class="estado-dica">"${esc(c.clue)}"</div><div class="estado-de">O grupo está adivinhando na tela principal.</div>`;
+    } else {
+      estadoEl.className = 'estado-panel estado-adivinhando';
+      estadoEl.innerHTML = `<div class="estado-title">Dica de ${esc(c.playerName)}:</div><div class="estado-dica">"${esc(c.clue)}"</div><div class="estado-de">Discutam e adivinhem na tela principal.</div>`;
+    }
+    estadoEl.style.display = 'block';
+  } else {
+    estadoEl.style.display = 'none';
+  }
+
+  // Minhas cartas
+  const cartasEl = document.getElementById('minhas-cartas');
+  if (!myState.cards || myState.cards.length === 0) {
+    cartasEl.innerHTML = '<div style="color:#aaa;font-size:.9rem;text-align:center;padding:12px 0">Sem cartas. Aguardando...</div>';
+  } else {
+    const podeDarDica = myState.phase === 'thinking';
+    cartasEl.innerHTML = myState.cards.map(card => `
+      <div class="carta ${cartaSelecionada === card.coord ? 'selecionada' : ''}"
+           onclick="${podeDarDica ? `selecionarCarta('${card.coord}')` : ''}">
+        <div class="carta-coord">${card.coord}</div>
+        <div class="carta-palavras">
+          <strong>${esc(card.rowWord)}</strong>
+          <span class="sep">×</span>
+          <strong>${esc(card.colWord)}</strong>
+        </div>
+        ${podeDarDica ? `<div style="font-size:.75rem;color:#aaa;margin-top:8px">Toque para dar dica com esta carta</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // Dar dica section
+  const darDicaEl = document.getElementById('dar-dica-section');
+  if (cartaSelecionada && myState.phase === 'thinking') {
+    darDicaEl.style.display = 'flex';
+  } else {
+    darDicaEl.style.display = 'none';
+    if (myState.phase !== 'thinking') cartaSelecionada = null;
+  }
+
+  // Pedir carta
+  const pedirEl = document.getElementById('pedir-section');
+  pedirEl.style.display = myState.canDraw ? 'block' : 'none';
+}
+
+function selecionarCarta(coord) {
+  if (myState.cards.length > 1) {
+    // Tem 2 cartas - mostra overlay para escolher
+    const sel = document.getElementById('sel-cartas');
+    sel.innerHTML = myState.cards.map(card => `
+      <button class="sel-card-btn" onclick="escolherCarta('${card.coord}')">
+        <div class="sel-coord">${card.coord}</div>
+        <div class="sel-palavras"><strong>${esc(card.rowWord)}</strong> × <strong>${esc(card.colWord)}</strong></div>
+      </button>
+    `).join('');
+    document.getElementById('overlay-sel').classList.add('vis');
+  } else {
+    cartaSelecionada = coord;
+    render();
+    setTimeout(() => document.getElementById('dica-input')?.focus(), 50);
+  }
+}
+
+function escolherCarta(coord) {
+  cartaSelecionada = coord;
+  fecharOverlaySel();
+  render();
+  setTimeout(() => document.getElementById('dica-input')?.focus(), 50);
+}
+
+function fecharOverlaySel() {
+  document.getElementById('overlay-sel').classList.remove('vis');
+}
+
+function cancelarDica() {
+  cartaSelecionada = null;
+  document.getElementById('dica-input').value = '';
+  document.getElementById('dica-err').textContent = '';
+  render();
+}
+
+function enviarDica() {
+  const inp = document.getElementById('dica-input');
+  const errEl = document.getElementById('dica-err');
+  const clue = inp.value.trim();
+  if (!clue) { errEl.textContent = 'Digite uma dica.'; return; }
+  if (clue.includes(' ')) { errEl.textContent = 'Apenas uma palavra!'; return; }
+  if (!cartaSelecionada) { errEl.textContent = 'Selecione uma carta.'; return; }
+  errEl.textContent = '';
+  socket.emit('submitClue', { clue, coord: cartaSelecionada });
+  cartaSelecionada = null;
+  inp.value = '';
+}
+
+socket.on('clueError', (msg) => {
+  document.getElementById('dica-err').textContent = msg;
+});
+
+function pedirCarta() {
+  socket.emit('drawCard');
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
