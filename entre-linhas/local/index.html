@@ -803,10 +803,6 @@ function mostrarCartaEspecifica(coord) {
   const palavraLinha = G.linhas[l];
   const palavraColuna = G.colunas[n];
 
-  document.getElementById('carta-coord-display').textContent = coord;
-  document.getElementById('carta-palavras-display').innerHTML =
-    `<strong>${esc(palavraLinha)}</strong> <span style="color:#aaa">×</span> <strong>${esc(palavraColuna)}</strong>`;
-
   document.getElementById('carta-conteudo').innerHTML = `
     <div class="carta-coord" id="carta-coord-display">${coord}</div>
     <div class="carta-palavras">
