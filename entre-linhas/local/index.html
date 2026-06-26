@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entre Linhas</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --rosa: #c94070;
+  --verde: #2e9e5b;
+  --escuro: #2a1a0e;
+  --amarelo: #f5c842;
+  --fundo: #f5f0e8;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--fundo);
+  color: var(--escuro);
+  min-height: 100vh;
+}
+
+/* ---- TELAS ---- */
+.tela { display: none; }
+.tela.ativa { display: flex; flex-direction: column; }
+
+/* ---- TIPOGRAFIA ---- */
+h1 { font-size: clamp(2.5rem, 8vw, 4rem); font-weight: 900; line-height: 1; }
+h2 { font-size: 1.25rem; font-weight: 700; }
+h3 { font-size: 1rem; font-weight: 700; }
+
+/* ---- BOTÕES ---- */
+button {
+  padding: 12px 24px; border: none; border-radius: 12px;
+  font-size: 1rem; font-weight: 700; cursor: pointer;
+  transition: transform .1s, opacity .15s;
+}
+button:active { transform: scale(.96); }
+button:disabled { opacity: .35; cursor: default; transform: none; }
+.btn-rosa   { background: var(--rosa); color: #fff; }
+.btn-escuro { background: var(--escuro); color: #fff; }
+.btn-verde  { background: var(--verde); color: #fff; }
+.btn-outline { background: transparent; border: 2px solid var(--rosa); color: var(--rosa); }
+.btn-lg  { padding: 16px 32px; font-size: 1.1rem; }
+.btn-sm  { padding: 8px 16px; font-size: .875rem; }
+.btn-full { width: 100%; }
+
+/* ---- INPUTS ---- */
+input, select {
+  width: 100%; padding: 12px 14px; border: 2px solid #ddd;
+  border-radius: 10px; font-size: 1rem; background: #fff;
+  outline: none; transition: border-color .2s;
+}
+input:focus, select:focus { border-color: var(--rosa); }
+
+/* ---- CARD ---- */
+.card {
+  background: #fff; border-radius: 16px; padding: 20px;
+  box-shadow: 0 2px 14px rgba(0,0,0,.07);
+}
+
+/* ============================
+   TELA: INÍCIO
+   ============================ */
+#tela-inicio {
+  align-items: center; justify-content: center;
+  min-height: 100vh; gap: 28px; padding: 24px;
+  text-align: center;
+}
+.logo-titulo { color: var(--rosa); }
+.logo-sub { color: #888; font-size: .95rem; margin-top: 6px; }
+
+#inicio-card {
+  width: 100%; max-width: 420px;
+}
+
+.jogadores-lista { display: flex; flex-direction: column; gap: 8px; }
+.jogador-linha {
+  display: flex; gap: 8px; align-items: center;
+}
+.jogador-linha input { flex: 1; }
+.remover-btn {
+  background: #fee; color: #c00; border: none; border-radius: 8px;
+  padding: 8px 12px; cursor: pointer; font-size: 1rem; font-weight: 700;
+  flex-shrink: 0;
+}
+
+.config-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+.config-row > div { flex: 1; min-width: 140px; }
+.config-label { font-size: .85rem; font-weight: 600; color: #666; margin-bottom: 6px; }
+
+.erro { color: #c00; font-size: .85rem; margin-top: 8px; font-weight: 600; }
+
+/* ============================
+   TELA: JOGO
+   ============================ */
+#tela-jogo {
+  min-height: 100vh;
+}
+
+.jogo-header {
+  background: var(--escuro); color: #fff;
+  padding: 12px 20px; display: flex; align-items: center;
+  justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  position: sticky; top: 0; z-index: 20;
+}
+.jogo-header-titulo { font-weight: 900; font-size: 1.1rem; }
+.pontos { font-size: 1.1rem; font-weight: 700; color: var(--amarelo); }
+.timer { font-size: 1.2rem; font-weight: 900; color: var(--amarelo); font-variant-numeric: tabular-nums; }
+.timer.urgente { color: #ff6b6b; animation: pisca .5s step-end infinite; }
+@keyframes pisca { 50% { opacity: .3; } }
+.fase-badge {
+  padding: 4px 12px; border-radius: 20px; font-size: .78rem; font-weight: 700;
+}
+.fase-pensando { background: #e8f5ee; color: var(--verde); }
+.fase-adivinhando { background: #fff3f6; color: var(--rosa); }
+
+.jogo-corpo { padding: 16px; max-width: 900px; margin: 0 auto; }
+
+/* Grid */
+.grid-wrap { overflow-x: auto; margin-bottom: 16px; }
+.grid-table { border-collapse: separate; border-spacing: 5px; }
+.celula-eixo {
+  background: var(--escuro); color: #fff; border-radius: 8px;
+  padding: 8px; text-align: center; font-size: .7rem;
+  max-width: 80px; min-width: 60px;
+}
+.eixo-letra { font-size: 1.1rem; font-weight: 900; }
+.eixo-palavra { font-size: .65rem; opacity: .8; margin-top: 2px; word-break: break-word; }
+
+.celula-jogo {
+  width: clamp(60px, 10vw, 88px);
+  height: clamp(60px, 10vw, 88px);
+  border-radius: 10px; border: 2px solid #ddd;
+  background: #fafafa; cursor: pointer;
+  transition: all .12s;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center; padding: 4px;
+  position: relative;
+}
+.celula-jogo:hover:not(.colocada):not(.bloqueada) {
+  border-color: var(--rosa); background: #fff3f6;
+}
+.celula-jogo.selecionada {
+  border-color: var(--rosa); background: #fff3f6;
+  box-shadow: 0 0 0 3px rgba(201,64,112,.25);
+}
+.celula-jogo.colocada {
+  background: #e8f5ee; border-color: var(--verde); cursor: default;
+}
+.celula-jogo.errada { background: #fde8e8; border-color: #e05252; }
+.celula-jogo.bloqueada { cursor: default; }
+.celula-coord { font-size: .65rem; font-weight: 700; color: #bbb; }
+.celula-dica { font-size: .7rem; font-weight: 700; color: var(--verde); word-break: break-word; }
+.celula-check { font-size: 1.3rem; }
+
+/* Painel dica ativa */
+.dica-ativa {
+  background: var(--escuro); color: #fff; border-radius: 16px;
+  padding: 20px; margin-bottom: 16px;
+}
+.dica-palavra { font-size: clamp(1.6rem, 5vw, 2.8rem); font-weight: 900; color: var(--amarelo); }
+.dica-de { font-size: .85rem; color: #aaa; margin-top: 2px; }
+.instrucao { color: #ccc; font-size: .9rem; margin: 10px 0 6px; }
+.palpite-row { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.palpite-atual { font-size: 1rem; font-weight: 700; }
+.palpite-atual span { color: var(--amarelo); }
+
+/* Jogadores barra */
+.jogadores-jogo { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.jogador-chip {
+  display: flex; align-items: center; gap: 6px;
+  background: #fff; border-radius: 20px; padding: 6px 12px;
+  font-size: .85rem; font-weight: 600; border: 2px solid #eee;
+}
+.avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .8rem; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.chip-cartas { font-size: .75rem; color: #888; }
+.chip-dando { border-color: var(--amarelo); }
+
+/* Seção dar dica */
+.secao-dar-dica { margin-bottom: 16px; }
+.dar-dica-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.dar-dica-btn {
+  flex: 1; min-width: 140px; background: #fff; border: 2px solid #ddd;
+  border-radius: 12px; padding: 14px; cursor: pointer; text-align: center;
+  transition: all .12s; display: flex; flex-direction: column; gap: 4px;
+}
+.dar-dica-btn:hover { border-color: var(--rosa); background: #fff3f6; }
+.dar-dica-nome { font-weight: 700; font-size: .95rem; }
+.dar-dica-info { font-size: .75rem; color: #888; }
+
+/* Dicas usadas */
+.dicas-usadas { display: flex; flex-wrap: wrap; gap: 6px; }
+.dica-tag {
+  background: #eee; color: #777; padding: 4px 10px;
+  border-radius: 20px; font-size: .75rem; text-decoration: line-through;
+}
+
+/* ============================
+   TELA: FIM
+   ============================ */
+#tela-fim {
+  align-items: center; justify-content: center;
+  min-height: 100vh; padding: 24px; text-align: center; gap: 20px;
+}
+.fim-card { max-width: 400px; width: 100%; padding: 40px 28px; }
+.pontos-big { font-size: 5rem; font-weight: 900; color: var(--rosa); line-height: 1; }
+.pontos-label { color: #888; font-size: 1.1rem; }
+.pontos-rating { font-size: 1.4rem; font-weight: 700; margin-top: 10px; }
+.pontos-guia { font-size: .85rem; color: #aaa; margin-top: 8px; }
+
+/* ============================
+   OVERLAY: CARTA SECRETA
+   ============================ */
+#overlay-carta {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.85); z-index: 100;
+  align-items: center; justify-content: center; padding: 24px;
+}
+#overlay-carta.visivel { display: flex; }
+.carta-modal {
+  background: #fff; border-radius: 20px;
+  padding: 32px 28px; max-width: 400px; width: 100%;
+  text-align: center;
+}
+.carta-modal h2 { margin-bottom: 4px; }
+.carta-modal .sub { color: #888; font-size: .9rem; margin-bottom: 24px; }
+.olhem-aviso {
+  background: #fff3f6; border: 2px dashed var(--rosa);
+  border-radius: 12px; padding: 16px; margin-bottom: 20px;
+  font-weight: 700; color: var(--rosa); font-size: .95rem;
+}
+.carta-coord { font-size: 3.5rem; font-weight: 900; color: var(--rosa); line-height: 1; }
+.carta-palavras { font-size: 1rem; color: #555; margin: 12px 0 24px; }
+.carta-palavras strong { color: var(--escuro); font-size: 1.1rem; }
+.dica-form { display: flex; flex-direction: column; gap: 10px; }
+.dica-form input { font-size: 1.1rem; text-align: center; }
+.dica-erro { color: #c00; font-size: .85rem; font-weight: 600; }
+
+/* ============================
+   OVERLAY: RESULTADO
+   ============================ */
+#overlay-resultado {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.75); z-index: 100;
+  align-items: center; justify-content: center; padding: 24px;
+}
+#overlay-resultado.visivel { display: flex; }
+.resultado-modal {
+  border-radius: 24px; padding: 40px 32px;
+  max-width: 380px; width: 100%; text-align: center;
+}
+.resultado-modal.acerto { background: #e8f5ee; border: 3px solid var(--verde); }
+.resultado-modal.erro   { background: #fde8e8; border: 3px solid #e05252; }
+.resultado-icone { font-size: 4rem; line-height: 1; margin-bottom: 12px; }
+.resultado-titulo { font-size: 1.8rem; font-weight: 900; margin-bottom: 8px; }
+.resultado-acerto .resultado-titulo { color: var(--verde); }
+.resultado-erro   .resultado-titulo { color: #e05252; }
+.resultado-detalhe { color: #555; font-size: .95rem; margin-bottom: 24px; }
+
+/* ============================
+   CORES DOS AVATARES
+   ============================ */
+.av0 { background: #c94070; }
+.av1 { background: #2e9e5b; }
+.av2 { background: #1e6fc4; }
+.av3 { background: #f5a623; }
+.av4 { background: #9b59b6; }
+.av5 { background: #16a085; }
+.av6 { background: #e74c3c; }
+.av7 { background: #2980b9; }
+
+/* Util */
+.mt8  { margin-top: 8px; }
+.mt16 { margin-top: 16px; }
+.mt24 { margin-top: 24px; }
+.flex-gap { display: flex; gap: 8px; }
+.secao-titulo { font-size: .8rem; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<!-- ========================
+     TELA: INÍCIO
+     ======================== -->
+<div id="tela-inicio" class="tela ativa">
+  <h1>Entre<span class="logo-titulo">Linhas</span></h1>
+  <p class="logo-sub">Jogo cooperativo de palavras</p>
+
+  <div class="card" id="inicio-card">
+    <h2 style="margin-bottom:16px">Quem vai jogar?</h2>
+
+    <div class="jogadores-lista" id="lista-jogadores"></div>
+
+    <button class="btn-outline btn-sm mt8" onclick="adicionarJogador()" id="btn-adicionar">
+      + Adicionar jogador
+    </button>
+
+    <div class="config-row">
+      <div>
+        <div class="config-label">Tamanho da tabela</div>
+        <select id="tamanho">
+          <option value="3">Expresso 3×3 (rápido)</option>
+          <option value="4" selected>Clássico 4×4</option>
+          <option value="5">Expert 5×5</option>
+        </select>
+      </div>
+      <div>
+        <div class="config-label">Cronômetro</div>
+        <select id="cronometro">
+          <option value="0">Sem limite de tempo</option>
+          <option value="5">5 minutos</option>
+          <option value="10">10 minutos</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="inicio-erro" class="erro"></div>
+
+    <button class="btn-rosa btn-full btn-lg mt16" onclick="iniciarJogo()">
+      Começar Partida →
+    </button>
+  </div>
+</div>
+
+<!-- ========================
+     TELA: JOGO
+     ======================== -->
+<div id="tela-jogo" class="tela">
+  <div class="jogo-header">
+    <div>
+      <div class="jogo-header-titulo">Entre Linhas</div>
+      <div id="fase-display"></div>
+    </div>
+    <div class="pontos" id="display-pontos">Pontos: 0</div>
+    <div class="timer" id="display-timer" style="display:none"></div>
+  </div>
+
+  <div class="jogo-corpo">
+    <!-- Jogadores -->
+    <div class="jogadores-jogo" id="chips-jogadores"></div>
+
+    <!-- Dica ativa -->
+    <div class="dica-ativa" id="painel-dica-ativa" style="display:none">
+      <div class="dica-de" id="dica-de-texto"></div>
+      <div class="dica-palavra" id="dica-palavra-display"></div>
+      <div class="instrucao">Clique em uma célula da tabela para selecionar o palpite do grupo:</div>
+      <div class="palpite-row">
+        <div class="palpite-atual">Palpite selecionado: <span id="palpite-coord">—</span></div>
+        <button class="btn-verde btn-sm" id="btn-confirmar" onclick="confirmarPalpite()" disabled>
+          Confirmar ✓
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="card mt8" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <h2>Tabela</h2>
+        <span id="contagem-colocadas" style="font-size:.85rem;color:#888"></span>
+      </div>
+      <div class="grid-wrap">
+        <table class="grid-table" id="grid-table"></table>
+      </div>
+    </div>
+
+    <!-- Dar dica -->
+    <div class="secao-dar-dica card" id="secao-dar-dica" style="margin-bottom:16px">
+      <div class="secao-titulo">Quem quer dar uma dica agora?</div>
+      <div class="dar-dica-grid" id="botoes-dar-dica"></div>
+    </div>
+
+    <!-- Dicas usadas -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="secao-titulo" style="margin-bottom:8px">Dicas já usadas (não podem repetir)</div>
+      <div id="dicas-usadas" class="dicas-usadas">
+        <span style="color:#aaa;font-size:.85rem">Nenhuma ainda</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================
+     TELA: FIM
+     ======================== -->
+<div id="tela-fim" class="tela">
+  <div class="card fim-card">
+    <h1 style="font-size:2rem;margin-bottom:16px">Fim de Jogo!</h1>
+    <div class="pontos-big" id="fim-pontos">0</div>
+    <div class="pontos-label">cartas colocadas na tabela</div>
+    <div class="pontos-rating" id="fim-rating"></div>
+    <div class="pontos-guia" id="fim-guia"></div>
+    <button class="btn-rosa btn-full btn-lg" style="margin-top:28px" onclick="jogarNovamente()">
+      Jogar Novamente
+    </button>
+    <button class="btn-outline btn-full" style="margin-top:10px" onclick="voltarInicio()">
+      Mudar Jogadores / Configurações
+    </button>
+  </div>
+</div>
+
+<!-- ========================
+     OVERLAY: CARTA SECRETA
+     ======================== -->
+<div id="overlay-carta">
+  <div class="carta-modal">
+    <h2 id="carta-jogador-nome"></h2>
+    <p class="sub">Olhe sua carta secreta. Os outros devem olhar para o lado!</p>
+
+    <div class="olhem-aviso">
+      👀 Todos os outros: olhem para o lado agora!
+    </div>
+
+    <div id="carta-conteudo" style="display:none">
+      <div class="carta-coord" id="carta-coord-display"></div>
+      <div class="carta-palavras" id="carta-palavras-display"></div>
+
+      <div class="dica-form">
+        <div style="font-size:.9rem;color:#555;text-align:left;margin-bottom:4px">
+          Pense em <strong>uma palavra</strong> que conecte as duas palavras acima e digite:
+        </div>
+        <input id="input-dica" type="text" placeholder="Sua dica..." maxlength="30"
+               autocomplete="off" autocorrect="off" spellcheck="false"
+               onkeydown="if(event.key==='Enter') revelarDica()">
+        <div id="dica-form-erro" class="dica-erro"></div>
+        <button class="btn-rosa" onclick="revelarDica()">Dizer a dica em voz alta →</button>
+      </div>
+    </div>
+
+    <div id="carta-revelar" style="margin-top:16px">
+      <button class="btn-escuro btn-full" onclick="mostrarCarta()">
+        Mostrar minha carta (os outros olharam para o lado?)
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================
+     OVERLAY: RESULTADO
+     ======================== -->
+<div id="overlay-resultado">
+  <div class="resultado-modal" id="resultado-modal">
+    <div class="resultado-icone" id="resultado-icone"></div>
+    <div class="resultado-titulo" id="resultado-titulo"></div>
+    <div class="resultado-detalhe" id="resultado-detalhe"></div>
+    <button class="btn-escuro btn-full" onclick="fecharResultado()">Continuar →</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// PALAVRAS-CHAVE
+// ============================================================
+const PALAVRAS = [
+  'Cabra','Laranja','Medo','Macaco','Raiva','Cobra','Bigode','Urso','Segurança','Armadura',
+  'Lento','Fogo','Ônibus','Cavalo','Orelha','Relâmpago','Carro','Homem','Mulher','Cavaleiro',
+  'Inimigo','Preto','Salada','Verde','Sanduíche','Óculos','Frango','Oceano','Cadeia','Casa',
+  'Veterinário','Professor','Bombeiro','Dia','Pesado','Gelo','Cachorro','Doença','Velho','Caixa',
+  'Sofá','Prato','Anel','Capa','Pedra','Papel','Herói','Carta','Outono','Buraco',
+  'Paraquedas','Avião','Pé','Capacete','Zoológico','Motocicleta','Alegria','Tristeza','Férias','Caracol',
+  'Polvo','Tubarão','Notebook','Bolo','Felicidade','Vermelho','Terra','Estrada','Vento','Cinza',
+  'Aranha','Rosa','Rabanete','Branco','Trigo','Verão','Surpresa','Viagem','Chapéu','Robô',
+  'Mel','Porco','Dinossauro','Dragão','Lobo','Amarelo','Peixe','Piano','Unicórnio','Rato',
+  'Açúcar','Nojo','Mala','Vaca','Tempo','Feio','Amigos','Rei','Rápido','Quente',
+  'Deserto','Morango','Aeroporto','Castelo','Trem','Tomate','Cabeça','Queijo','Criança','Espaçonave',
+  'Inverno','Escola','Rainha','Lâmpada','Sopa','Pintura','Olho','Água','Lua','Marte',
+  'Selva','Montanha','Praia','Neve','Pera','Caneta','Helicóptero','Pato','Camelo','Noite',
+  'Detetive','Bicicleta','Pirata','Enfermeira','Médico','Soldado','Cozinheiro','Luz','Banana','Circo',
+  'Chocolate','Planeta','Mapa','Presidente','Guerra','Tesouro','Alto','Camisa','Malvado','Frio',
+  'Barco','Diamante','Cama','Violão','Azul','Abacate','Bola','Cogumelo','Madeira','Livro',
+  'Gato','Primavera','Pombo','Bolsa','Flecha','Marrom','Lentilhas','Tórax','Sobremesa','Feijão',
+  'Espada','Coroa','Dragão','Bruxa','Fada','Gigante','Navio','Foguete','Robô','Fantasma',
+];
+
+const CORES_AV = ['av0','av1','av2','av3','av4','av5','av6','av7'];
+
+// ============================================================
+// ESTADO DO JOGO
+// ============================================================
+let G = {}; // estado global
+
+// ============================================================
+// TELA INICIAL
+// ============================================================
+function mostrarTela(id) {
+  document.querySelectorAll('.tela').forEach(t => t.classList.remove('ativa'));
+  document.getElementById(id).classList.add('ativa');
+}
+
+// Nomes dos jogadores na tela inicial
+let nomesIniciais = ['', ''];
+
+function renderLista() {
+  const lista = document.getElementById('lista-jogadores');
+  lista.innerHTML = nomesIniciais.map((nome, i) => `
+    <div class="jogador-linha">
+      <input type="text" placeholder="Jogador ${i+1}" value="${esc(nome)}"
+             maxlength="20" oninput="nomesIniciais[${i}]=this.value">
+      ${i >= 2 ? `<button class="remover-btn" onclick="removerJogador(${i})">✕</button>` : ''}
+    </div>
+  `).join('');
+  document.getElementById('btn-adicionar').style.display =
+    nomesIniciais.length >= 8 ? 'none' : 'block';
+}
+
+function adicionarJogador() {
+  if (nomesIniciais.length < 8) {
+    nomesIniciais.push('');
+    renderLista();
+  }
+}
+
+function removerJogador(i) {
+  nomesIniciais.splice(i, 1);
+  renderLista();
+}
+
+renderLista();
+
+function iniciarJogo() {
+  // Lê os inputs atuais
+  document.querySelectorAll('#lista-jogadores input').forEach((inp, i) => {
+    nomesIniciais[i] = inp.value.trim();
+  });
+
+  const nomes = nomesIniciais.filter(n => n.length > 0);
+  const erro = document.getElementById('inicio-erro');
+
+  if (nomes.length < 2) { erro.textContent = 'Adicione pelo menos 2 jogadores.'; return; }
+
+  const tamanho = parseInt(document.getElementById('tamanho').value);
+  const cronoMin = parseInt(document.getElementById('cronometro').value);
+
+  erro.textContent = '';
+  construirJogo(nomes, tamanho, cronoMin);
+  mostrarTela('tela-jogo');
+}
+
+// ============================================================
+// CONSTRUÇÃO DO JOGO
+// ============================================================
+function embaralhar(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function construirJogo(nomes, tamanho, cronoMin) {
+  const letras = ['A','B','C','D','E'].slice(0, tamanho);
+  const numeros = [1,2,3,4,5].slice(0, tamanho);
+  const palavrasEmbaralhadas = embaralhar(PALAVRAS).slice(0, tamanho * 2);
+
+  const linhas = {}, colunas = {};
+  letras.forEach((l, i) => linhas[l] = palavrasEmbaralhadas[i]);
+  numeros.forEach((n, i) => colunas[n] = palavrasEmbaralhadas[tamanho + i]);
+
+  // Gera todas as cartas de dica e embaralha
+  const todasCartas = [];
+  letras.forEach(l => numeros.forEach(n => todasCartas.push(`${l}${n}`)));
+  const pilha = embaralhar(todasCartas);
+
+  // Distribui cartas aos jogadores (2-3 jogadores: 2 cartas; 4+: 1 carta)
+  const cartasPorJogador = nomes.length <= 3 ? 2 : 1;
+  const jogadores = nomes.map((nome, i) => {
+    const cartas = [];
+    for (let c = 0; c < cartasPorJogador && pilha.length > 0; c++) {
+      cartas.push(pilha.pop());
+    }
+    return { nome, cartas, indice: i };
+  });
+
+  G = {
+    tamanho, letras, numeros, linhas, colunas,
+    jogadores, pilha,
+    colocadas: {},      // coord -> { dica, jogadorNome }
+    dicasUsadas: new Set(),
+    pontos: 0,
+    fase: 'pensando',   // 'pensando' | 'adivinhando'
+    dicaAtiva: null,    // { jogadorIdx, dica, coord }
+    palpiteSelecionado: null,
+    cronoMin, tempoRestante: cronoMin * 60,
+    intervalo: null,
+    ultimoResultado: null,
+    cartaJogadorAtual: null, // jogadorIdx que está no overlay
+  };
+
+  if (cronoMin > 0) {
+    G.intervalo = setInterval(() => {
+      G.tempoRestante--;
+      atualizarTimer();
+      if (G.tempoRestante <= 0) finalizarJogo();
+    }, 1000);
+  }
+
+  renderJogo();
+}
+
+// ============================================================
+// RENDER PRINCIPAL
+// ============================================================
+function renderJogo() {
+  // Pontos
+  document.getElementById('display-pontos').textContent = `Pontos: ${G.pontos}`;
+
+  // Fase
+  const fase = document.getElementById('fase-display');
+  if (G.fase === 'pensando') {
+    fase.innerHTML = '<span class="fase-badge fase-pensando">Pensando...</span>';
+  } else {
+    fase.innerHTML = '<span class="fase-badge fase-adivinhando">Adivinhando!</span>';
+  }
+
+  // Timer
+  atualizarTimer();
+
+  // Chips dos jogadores
+  const chips = document.getElementById('chips-jogadores');
+  chips.innerHTML = G.jogadores.map((j, i) => {
+    const dando = G.dicaAtiva && G.dicaAtiva.jogadorIdx === i;
+    return `
+      <div class="jogador-chip ${dando ? 'chip-dando' : ''}">
+        <div class="avatar ${CORES_AV[i % 8]}">${j.nome[0].toUpperCase()}</div>
+        ${esc(j.nome)}
+        <span class="chip-cartas">${j.cartas.length} carta(s)</span>
+        ${dando ? '💬' : ''}
+      </div>
+    `;
+  }).join('');
+
+  // Painel dica ativa
+  const painelDica = document.getElementById('painel-dica-ativa');
+  if (G.dicaAtiva) {
+    painelDica.style.display = 'block';
+    const j = G.jogadores[G.dicaAtiva.jogadorIdx];
+    document.getElementById('dica-de-texto').textContent = `Dica de ${j.nome}:`;
+    document.getElementById('dica-palavra-display').textContent = G.dicaAtiva.dica;
+    document.getElementById('palpite-coord').textContent = G.palpiteSelecionado || '—';
+    document.getElementById('btn-confirmar').disabled = !G.palpiteSelecionado;
+  } else {
+    painelDica.style.display = 'none';
+  }
+
+  // Grid
+  renderGrid();
+
+  // Botões "dar dica"
+  const secaoDarDica = document.getElementById('secao-dar-dica');
+  const botoesDarDica = document.getElementById('botoes-dar-dica');
+  if (G.fase === 'pensando') {
+    secaoDarDica.style.display = 'block';
+    botoesDarDica.innerHTML = G.jogadores
+      .filter(j => j.cartas.length > 0)
+      .map(j => `
+        <button class="dar-dica-btn" onclick="abrirOverlayDica(${j.indice})">
+          <div class="dar-dica-nome">${esc(j.nome)}</div>
+          <div class="dar-dica-info">${j.cartas.length} carta(s) na mão</div>
+        </button>
+      `).join('');
+    if (G.jogadores.every(j => j.cartas.length === 0)) {
+      botoesDarDica.innerHTML = '<span style="color:#aaa;font-size:.9rem">Nenhum jogador tem cartas.</span>';
+    }
+  } else {
+    secaoDarDica.style.display = 'none';
+  }
+
+  // Dicas usadas
+  const dicasEl = document.getElementById('dicas-usadas');
+  if (G.dicasUsadas.size === 0) {
+    dicasEl.innerHTML = '<span style="color:#aaa;font-size:.85rem">Nenhuma ainda</span>';
+  } else {
+    dicasEl.innerHTML = [...G.dicasUsadas].map(d => `<span class="dica-tag">${esc(d)}</span>`).join('');
+  }
+
+  // Contagem
+  document.getElementById('contagem-colocadas').textContent =
+    `${Object.keys(G.colocadas).length} / ${G.tamanho * G.tamanho}`;
+}
+
+function renderGrid() {
+  const table = document.getElementById('grid-table');
+  let html = '<thead><tr><th></th>';
+  G.numeros.forEach(n => {
+    html += `<th><div class="celula-eixo">
+      <div class="eixo-letra">${n}</div>
+      <div class="eixo-palavra">${esc(G.colunas[n])}</div>
+    </div></th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  G.letras.forEach(l => {
+    html += `<tr><td><div class="celula-eixo">
+      <div class="eixo-letra">${l}</div>
+      <div class="eixo-palavra">${esc(G.linhas[l])}</div>
+    </div></td>`;
+
+    G.numeros.forEach(n => {
+      const coord = `${l}${n}`;
+      const colocada = G.colocadas[coord];
+      const adivinhando = G.fase === 'adivinhando' && G.dicaAtiva;
+      const isErrada = G.ultimoResultado && !G.ultimoResultado.acerto && G.ultimoResultado.palpite === coord;
+      const selecionada = G.palpiteSelecionado === coord;
+
+      let cls = 'celula-jogo';
+      if (colocada) cls += ' colocada';
+      else if (isErrada) cls += ' errada';
+      if (selecionada && adivinhando) cls += ' selecionada';
+      if (!adivinhando || colocada) cls += ' bloqueada';
+
+      const onclick = adivinhando && !colocada ? `selecionarPalpite('${coord}')` : '';
+
+      let inner = `<div class="celula-coord">${coord}</div>`;
+      if (colocada) {
+        inner = `<div class="celula-check">✓</div><div class="celula-dica">${esc(colocada.dica)}</div>`;
+      }
+
+      html += `<td><div class="${cls}" onclick="${onclick}">${inner}</div></td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+function atualizarTimer() {
+  const el = document.getElementById('display-timer');
+  if (G.cronoMin === 0) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  const s = G.tempoRestante;
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  el.textContent = `⏱ ${m}:${sec.toString().padStart(2,'0')}`;
+  el.className = 'timer' + (s <= 30 ? ' urgente' : '');
+}
+
+// ============================================================
+// OVERLAY: CARTA SECRETA
+// ============================================================
+function abrirOverlayDica(jogadorIdx) {
+  if (G.fase !== 'pensando') return;
+  G.cartaJogadorAtual = jogadorIdx;
+
+  const j = G.jogadores[jogadorIdx];
+  document.getElementById('carta-jogador-nome').textContent = `Vez de ${j.nome}`;
+  document.getElementById('carta-conteudo').style.display = 'none';
+  document.getElementById('carta-revelar').style.display = 'block';
+  document.getElementById('input-dica').value = '';
+  document.getElementById('dica-form-erro').textContent = '';
+
+  document.getElementById('overlay-carta').classList.add('visivel');
+}
+
+function mostrarCarta() {
+  const j = G.jogadores[G.cartaJogadorAtual];
+
+  // Se tem mais de uma carta, pega a primeira (pode melhorar depois)
+  // Mostra as cartas disponíveis para o jogador escolher
+  const cartas = j.cartas;
+
+  if (cartas.length === 0) {
+    fecharOverlayCarta();
+    return;
+  }
+
+  // Se tem 2 cartas, mostra as duas para o jogador escolher
+  let html = '';
+  if (cartas.length === 1) {
+    mostrarCartaEspecifica(cartas[0]);
+  } else {
+    // Mostra as opções
+    document.getElementById('carta-conteudo').innerHTML = `
+      <div style="font-size:.9rem;color:#555;margin-bottom:12px">Escolha qual carta usar:</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${cartas.map((coord, i) => {
+          const l = coord[0], n = parseInt(coord[1]);
+          return `
+            <button class="btn-outline" onclick="mostrarCartaEspecifica('${coord}')">
+              <strong>${coord}</strong> — ${esc(G.linhas[l])} × ${esc(G.colunas[n])}
+            </button>
+          `;
+        }).join('')}
+      </div>
+    `;
+    document.getElementById('carta-conteudo').style.display = 'block';
+    document.getElementById('carta-revelar').style.display = 'none';
+  }
+}
+
+G._coordEscolhida = null;
+
+function mostrarCartaEspecifica(coord) {
+  G._coordEscolhida = coord;
+  const l = coord[0], n = parseInt(coord[1]);
+  const palavraLinha = G.linhas[l];
+  const palavraColuna = G.colunas[n];
+
+  document.getElementById('carta-coord-display').textContent = coord;
+  document.getElementById('carta-palavras-display').innerHTML =
+    `<strong>${esc(palavraLinha)}</strong> <span style="color:#aaa">×</span> <strong>${esc(palavraColuna)}</strong>`;
+
+  document.getElementById('carta-conteudo').innerHTML = `
+    <div class="carta-coord" id="carta-coord-display">${coord}</div>
+    <div class="carta-palavras">
+      <strong>${esc(palavraLinha)}</strong>
+      <span style="color:#aaa"> × </span>
+      <strong>${esc(palavraColuna)}</strong>
+    </div>
+    <div class="dica-form">
+      <div style="font-size:.9rem;color:#555;text-align:left;margin-bottom:4px">
+        Pense em <strong>uma palavra</strong> que conecte as duas acima e digite:
+      </div>
+      <input id="input-dica" type="text" placeholder="Sua dica..." maxlength="30"
+             autocomplete="off" autocorrect="off" spellcheck="false"
+             onkeydown="if(event.key==='Enter') revelarDica()">
+      <div id="dica-form-erro" class="dica-erro"></div>
+      <button class="btn-rosa" onclick="revelarDica()">Dizer a dica em voz alta →</button>
+    </div>
+  `;
+  document.getElementById('carta-conteudo').style.display = 'block';
+  document.getElementById('carta-revelar').style.display = 'none';
+  setTimeout(() => document.getElementById('input-dica')?.focus(), 50);
+}
+
+function revelarDica() {
+  const input = document.getElementById('input-dica');
+  const dica = input ? input.value.trim() : '';
+  const erro = document.getElementById('dica-form-erro');
+
+  if (!dica) { erro.textContent = 'Digite uma dica.'; return; }
+  if (dica.includes(' ')) { erro.textContent = 'Apenas uma palavra!'; return; }
+  if (G.dicasUsadas.has(dica.toLowerCase())) { erro.textContent = 'Esta dica já foi usada.'; return; }
+
+  const coord = G._coordEscolhida;
+  const l = coord[0];
+  const palavraChave1 = G.linhas[l];
+  const palavraChave2 = G.colunas[parseInt(coord[1])];
+
+  // Verifica se a dica tem o mesmo radical das palavras-chave (verificação simples)
+  const dicaLower = dica.toLowerCase();
+  const pc1Lower = palavraChave1.toLowerCase();
+  const pc2Lower = palavraChave2.toLowerCase();
+  if (dicaLower.startsWith(pc1Lower.substring(0, 4)) && pc1Lower.length >= 4) {
+    erro.textContent = `Dica não pode ter o mesmo radical que "${palavraChave1}".`; return;
+  }
+  if (dicaLower.startsWith(pc2Lower.substring(0, 4)) && pc2Lower.length >= 4) {
+    erro.textContent = `Dica não pode ter o mesmo radical que "${palavraChave2}".`; return;
+  }
+
+  // Confirma a dica
+  G.fase = 'adivinhando';
+  G.dicaAtiva = { jogadorIdx: G.cartaJogadorAtual, dica, coord };
+  G.palpiteSelecionado = null;
+
+  fecharOverlayCarta();
+  renderJogo();
+}
+
+function fecharOverlayCarta() {
+  document.getElementById('overlay-carta').classList.remove('visivel');
+}
+
+// ============================================================
+// ADIVINHAR
+// ============================================================
+function selecionarPalpite(coord) {
+  if (G.fase !== 'adivinhando') return;
+  G.palpiteSelecionado = coord;
+  document.getElementById('palpite-coord').textContent = coord;
+  document.getElementById('btn-confirmar').disabled = false;
+  renderGrid();
+}
+
+function confirmarPalpite() {
+  if (!G.palpiteSelecionado || !G.dicaAtiva) return;
+
+  const acerto = G.palpiteSelecionado === G.dicaAtiva.coord;
+  const j = G.jogadores[G.dicaAtiva.jogadorIdx];
+
+  G.dicasUsadas.add(G.dicaAtiva.dica.toLowerCase());
+
+  if (acerto) {
+    G.colocadas[G.dicaAtiva.coord] = { dica: G.dicaAtiva.dica, jogadorNome: j.nome };
+    G.pontos++;
+  }
+
+  // Remove a carta da mão do jogador e compra nova
+  j.cartas = j.cartas.filter(c => c !== G.dicaAtiva.coord);
+  if (G.pilha.length > 0) {
+    j.cartas.push(G.pilha.pop());
+  }
+
+  G.ultimoResultado = { acerto, coord: G.dicaAtiva.coord, palpite: G.palpiteSelecionado, dica: G.dicaAtiva.dica };
+
+  const coordReal = G.dicaAtiva.coord;
+  const palpite = G.palpiteSelecionado;
+
+  G.dicaAtiva = null;
+  G.palpiteSelecionado = null;
+  G.fase = 'pensando';
+
+  // Mostra overlay resultado
+  mostrarResultado(acerto, coordReal, palpite);
+
+  // Verifica fim do jogo
+  const semCartas = G.jogadores.every(j => j.cartas.length === 0) && G.pilha.length === 0;
+  if (semCartas) {
+    setTimeout(() => finalizarJogo(), 2200);
+  }
+}
+
+function mostrarResultado(acerto, coordReal, palpite) {
+  const modal = document.getElementById('resultado-modal');
+  modal.className = 'resultado-modal ' + (acerto ? 'acerto' : 'erro');
+
+  document.getElementById('resultado-icone').textContent = acerto ? '🎉' : '😬';
+  document.getElementById('resultado-titulo').textContent = acerto ? 'Acertaram!' : 'Erraram!';
+
+  if (acerto) {
+    document.getElementById('resultado-detalhe').textContent =
+      `A dica estava mesmo na posição ${coordReal}. +1 ponto!`;
+  } else {
+    document.getElementById('resultado-detalhe').textContent =
+      `Vocês escolheram ${palpite}, mas a carta era ${coordReal}. Carta descartada.`;
+  }
+
+  document.getElementById('overlay-resultado').classList.add('visivel');
+  renderJogo();
+}
+
+function fecharResultado() {
+  document.getElementById('overlay-resultado').classList.remove('visivel');
+  G.ultimoResultado = null;
+  renderJogo();
+}
+
+// ============================================================
+// FIM DO JOGO
+// ============================================================
+function finalizarJogo() {
+  if (G.intervalo) { clearInterval(G.intervalo); G.intervalo = null; }
+  G.fase = 'fim';
+
+  const pontos = G.pontos;
+  const tamanho = G.tamanho;
+  document.getElementById('fim-pontos').textContent = pontos;
+
+  const ratings = {
+    3: [{max:3,l:'Fracasso 😬'},{max:5,l:'Mediano 🤔'},{max:7,l:'Bom! 💪'},{max:99,l:'Espetacular! 🤯'}],
+    4: [{max:7,l:'Fracasso 😬'},{max:11,l:'Mediano 🤔'},{max:14,l:'Bom! 💪'},{max:99,l:'Espetacular! 🤯'}],
+    5: [{max:11,l:'Fracasso 😬'},{max:16,l:'Mediano 🤔'},{max:22,l:'Bom! 💪'},{max:99,l:'Espetacular! 🤯'}],
+  };
+  const guias = {3:'Espetacular: 8+ | Bom: 6–7 | Mediano: 4–5', 4:'Espetacular: 15+ | Bom: 12–14 | Mediano: 8–11', 5:'Espetacular: 23+ | Bom: 17–22 | Mediano: 12–16'};
+  const rating = (ratings[tamanho] || ratings[4]).find(r => pontos <= r.max);
+  document.getElementById('fim-rating').textContent = rating ? rating.l : '';
+  document.getElementById('fim-guia').textContent = guias[tamanho] || '';
+
+  mostrarTela('tela-fim');
+}
+
+function jogarNovamente() {
+  // Mesmos jogadores, recomença
+  const nomes = G.jogadores.map(j => j.nome);
+  construirJogo(nomes, G.tamanho, G.cronoMin);
+  mostrarTela('tela-jogo');
+}
+
+function voltarInicio() {
+  if (G.intervalo) { clearInterval(G.intervalo); G.intervalo = null; }
+  mostrarTela('tela-inicio');
+}
+
+// ============================================================
+// UTIL
+// ============================================================
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
