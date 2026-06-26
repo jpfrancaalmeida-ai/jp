@@ -34,13 +34,20 @@ const KEYWORDS = [
   'Espada','Coroa','Bruxa','Fada','Gigante','Navio','Foguete','Fantasma','Feitiço','Dragão',
 ];
 
-function getLocalIP() {
+function getBaseUrl() {
+  // Railway injeta RAILWAY_PUBLIC_DOMAIN automaticamente
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+  }
+  // Fallback para rede local
   for (const ifaces of Object.values(os.networkInterfaces())) {
     for (const iface of ifaces) {
-      if (iface.family === 'IPv4' && !iface.internal) return iface.address;
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return `http://${iface.address}:${process.env.PORT || 3000}`;
+      }
     }
   }
-  return 'localhost';
+  return `http://localhost:${process.env.PORT || 3000}`;
 }
 
 function shuffle(arr) {
@@ -115,8 +122,7 @@ io.on('connection', socket => {
 
   socket.on('setupGame', ({ names, gridSize, cronoMin }) => {
     const code = rnd(5).toUpperCase();
-    const localIP = getLocalIP();
-    const port = process.env.PORT || 3000;
+    const baseUrl = getBaseUrl();
 
     const players = names.map((name, i) => ({
       index: i, name, token: rnd(8), cards: [], playerSocketId: null,
@@ -130,17 +136,17 @@ io.on('connection', socket => {
       score: 0, players,
       currentClue: null, groupGuess: null, lastResult: null,
       timeLeft: null, timerInterval: null,
-      hostSocketId: socket.id, localIP, port,
+      hostSocketId: socket.id,
     });
 
     socket.data.roomCode = code;
     socket.data.role = 'host';
 
     socket.emit('roomCreated', {
-      code, localIP, port,
+      code,
       players: players.map(p => ({
         name: p.name,
-        url: `http://${localIP}:${port}/p/${p.token}`,
+        url: `${baseUrl}/p/${p.token}`,
       })),
     });
   });
