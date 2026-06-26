@@ -1,0 +1,11 @@
+{
+  "name": "jp",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd entre-linhas && npm install",
+    "start": "node entre-linhas/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
