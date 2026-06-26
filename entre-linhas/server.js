@@ -34,12 +34,18 @@ const KEYWORDS = [
   'Espada','Coroa','Bruxa','Fada','Gigante','Navio','Foguete','Fantasma','Feitiço','Dragão',
 ];
 
-function getBaseUrl() {
-  // Railway injeta RAILWAY_PUBLIC_DOMAIN automaticamente
+function getBaseUrl(socket) {
+  // Usa o host do próprio socket — funciona local e em produção
+  const host = socket?.handshake?.headers?.host;
+  if (host) {
+    const isLocal = /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(host);
+    const proto = (!isLocal || socket?.handshake?.secure) ? 'https' : 'http';
+    return `${proto}://${host}`;
+  }
+  // Fallback: variável do Railway ou IP local
   if (process.env.RAILWAY_PUBLIC_DOMAIN) {
     return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
   }
-  // Fallback para rede local
   for (const ifaces of Object.values(os.networkInterfaces())) {
     for (const iface of ifaces) {
       if (iface.family === 'IPv4' && !iface.internal) {
@@ -122,7 +128,7 @@ io.on('connection', socket => {
 
   socket.on('setupGame', ({ names, gridSize, cronoMin }) => {
     const code = rnd(5).toUpperCase();
-    const baseUrl = getBaseUrl();
+    const baseUrl = getBaseUrl(socket);
 
     const players = names.map((name, i) => ({
       index: i, name, token: rnd(8), cards: [], playerSocketId: null,
