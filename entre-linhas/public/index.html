@@ -819,6 +819,15 @@ window.addEventListener('resize', computeCellSize);
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+window.addEventListener('beforeunload', function(e) {
+  const jogoAtivo = G && (G.phase === 'thinking' || G.phase === 'guessing');
+  const linksAtivo = document.getElementById('links-screen').classList.contains('active');
+  if (jogoAtivo || linksAtivo) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 </script>
 </body>
 </html>

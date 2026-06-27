@@ -559,6 +559,13 @@ function pedirCarta() { socket.emit('drawCard'); }
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+window.addEventListener('beforeunload', function(e) {
+  if (myState && myState.phase !== 'lobby' && myState.phase !== 'ended') {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 </script>
 </body>
 </html>
