@@ -35,25 +35,20 @@ const KEYWORDS = [
 ];
 
 function getBaseUrl(socket) {
-  // Usa o host do próprio socket — funciona local e em produção
-  const host = socket?.handshake?.headers?.host;
+  const host = socket && socket.handshake && socket.handshake.headers && socket.handshake.headers.host;
   if (host) {
     const isLocal = /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(host);
-    const proto = (!isLocal || socket?.handshake?.secure) ? 'https' : 'http';
-    return `${proto}://${host}`;
+    const proto = (!isLocal || (socket.handshake && socket.handshake.secure)) ? 'https' : 'http';
+    return proto + '://' + host;
   }
-  // Fallback: variável do Railway ou IP local
-  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
-    return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
-  }
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) return 'https://' + process.env.RAILWAY_PUBLIC_DOMAIN;
   for (const ifaces of Object.values(os.networkInterfaces())) {
     for (const iface of ifaces) {
-      if (iface.family === 'IPv4' && !iface.internal) {
-        return `http://${iface.address}:${process.env.PORT || 3000}`;
-      }
+      if (iface.family === 'IPv4' && !iface.internal)
+        return 'http://' + iface.address + ':' + (process.env.PORT || 3000);
     }
   }
-  return `http://localhost:${process.env.PORT || 3000}`;
+  return 'http://localhost:' + (process.env.PORT || 3000);
 }
 
 function shuffle(arr) {
@@ -68,9 +63,11 @@ function shuffle(arr) {
 function rnd(n) { return Math.random().toString(36).substr(2, n); }
 
 const rooms = new Map();
-const tokenMap = new Map(); // token -> { roomCode, playerIndex }
+const tokenMap = new Map();
 
 function publicState(room, code) {
+  const rh = room.raisedHand;
+  const rhPlayer = rh != null ? room.players[rh.playerIndex] : null;
   return {
     code, phase: room.phase,
     gridSize: room.gridSize,
@@ -79,31 +76,39 @@ function publicState(room, code) {
     placed: room.placed,
     usedClues: [...room.usedClues],
     score: room.score, pileCount: room.pile.length,
-    players: room.players.map(p => ({
-      index: p.index, name: p.name,
-      cardCount: p.cards.length,
-      connected: !!p.playerSocketId,
-    })),
+    players: room.players.map(function(p) {
+      return {
+        index: p.index, name: p.name,
+        cardCount: p.cards.length,
+        connected: !!p.playerSocketId,
+        hasRaisedHand: rh != null && rh.playerIndex === p.index,
+      };
+    }),
     currentClue: room.currentClue,
     groupGuess: room.groupGuess,
     lastResult: room.lastResult,
     timeLeft: room.timeLeft,
+    raisedHand: rh != null ? { playerIndex: rh.playerIndex, playerName: rhPlayer && rhPlayer.name } : null,
   };
 }
 
 function playerState(room, idx) {
   const p = room.players[idx];
+  const rh = room.raisedHand;
   return {
     name: p.name, playerIndex: idx,
-    cards: p.cards.map(coord => {
+    totalPlayers: room.players.length,
+    cards: p.cards.map(function(coord) {
       const l = coord[0], n = parseInt(coord[1]);
-      return { coord, rowWord: room.rows[l] || '?', colWord: room.cols[n] || '?' };
+      return { coord: coord, rowWord: room.rows[l] || '?', colWord: room.cols[n] || '?' };
     }),
-    canDraw: p.cards.length < 2 && room.pile.length > 0 && room.phase === 'thinking',
+    canDraw: p.cards.length < 2 && room.pile.length > 0 && room.phase === 'thinking' && room.players.length <= 3,
     phase: room.phase,
     currentClue: room.currentClue,
-    isGiving: room.currentClue?.playerIndex === idx,
+    isGiving: room.currentClue != null && room.currentClue.playerIndex === idx,
     score: room.score,
+    hasRaisedHand: rh != null && rh.playerIndex === idx,
+    raisedHand: rh != null ? { playerIndex: rh.playerIndex, playerName: room.players[rh.playerIndex] && room.players[rh.playerIndex].name } : null,
   };
 }
 
@@ -111,7 +116,7 @@ function broadcast(code) {
   const room = rooms.get(code);
   if (!room) return;
   if (room.hostSocketId) io.to(room.hostSocketId).emit('gameState', publicState(room, code));
-  room.players.forEach(p => {
+  room.players.forEach(function(p) {
     if (p.playerSocketId) io.to(p.playerSocketId).emit('myState', playerState(room, p.index));
   });
 }
@@ -121,26 +126,29 @@ function endGame(code) {
   if (!room) return;
   if (room.timerInterval) { clearInterval(room.timerInterval); room.timerInterval = null; }
   room.phase = 'ended';
+  room.raisedHand = null;
   broadcast(code);
 }
 
-io.on('connection', socket => {
+io.on('connection', function(socket) {
 
-  socket.on('setupGame', ({ names, gridSize, cronoMin }) => {
+  socket.on('setupGame', function(data) {
+    const names = data.names, gridSize = data.gridSize, cronoMin = data.cronoMin;
     const code = rnd(5).toUpperCase();
     const baseUrl = getBaseUrl(socket);
 
-    const players = names.map((name, i) => ({
-      index: i, name, token: rnd(8), cards: [], playerSocketId: null,
-    }));
-    players.forEach(p => tokenMap.set(p.token, { roomCode: code, playerIndex: p.index }));
+    const players = names.map(function(name, i) {
+      return { index: i, name: name, token: rnd(8), cards: [], playerSocketId: null };
+    });
+    players.forEach(function(p) { tokenMap.set(p.token, { roomCode: code, playerIndex: p.index }); });
 
     rooms.set(code, {
-      phase: 'lobby', gridSize, cronoMin,
+      phase: 'lobby', gridSize: gridSize, cronoMin: cronoMin,
       letters: [], numbers: [], rows: {}, cols: {},
       pile: [], placed: {}, usedClues: new Set(),
-      score: 0, players,
+      score: 0, players: players,
       currentClue: null, groupGuess: null, lastResult: null,
+      raisedHand: null,
       timeLeft: null, timerInterval: null,
       hostSocketId: socket.id,
     });
@@ -149,15 +157,14 @@ io.on('connection', socket => {
     socket.data.role = 'host';
 
     socket.emit('roomCreated', {
-      code,
-      players: players.map(p => ({
-        name: p.name,
-        url: `${baseUrl}/p/${p.token}`,
-      })),
+      code: code,
+      players: players.map(function(p) {
+        return { name: p.name, url: baseUrl + '/p/' + p.token };
+      }),
     });
   });
 
-  socket.on('startGame', () => {
+  socket.on('startGame', function() {
     const code = socket.data.roomCode;
     const room = rooms.get(code);
     if (!room || socket.data.role !== 'host') return;
@@ -168,11 +175,13 @@ io.on('connection', socket => {
 
     room.letters = letters;
     room.numbers = numbers;
-    room.rows = Object.fromEntries(letters.map((l, i) => [l, words[i]]));
-    room.cols = Object.fromEntries(numbers.map((n, i) => [n, words[room.gridSize + i]]));
+    room.rows = {};
+    letters.forEach(function(l, i) { room.rows[l] = words[i]; });
+    room.cols = {};
+    numbers.forEach(function(n, i) { room.cols[n] = words[room.gridSize + i]; });
 
     const pile = [];
-    letters.forEach(l => numbers.forEach(n => pile.push(`${l}${n}`)));
+    letters.forEach(function(l) { numbers.forEach(function(n) { pile.push(l + n); }); });
     room.pile = shuffle(pile);
     room.placed = {};
     room.usedClues = new Set();
@@ -181,9 +190,9 @@ io.on('connection', socket => {
     room.currentClue = null;
     room.groupGuess = null;
     room.lastResult = null;
+    room.raisedHand = null;
 
-    // 1 card per player to start
-    room.players.forEach(p => {
+    room.players.forEach(function(p) {
       p.cards = [];
       const c = room.pile.pop();
       if (c) p.cards.push(c);
@@ -191,7 +200,7 @@ io.on('connection', socket => {
 
     if (room.cronoMin > 0) {
       room.timeLeft = room.cronoMin * 60;
-      room.timerInterval = setInterval(() => {
+      room.timerInterval = setInterval(function() {
         room.timeLeft--;
         broadcast(code);
         if (room.timeLeft <= 0) endGame(code);
@@ -201,7 +210,8 @@ io.on('connection', socket => {
     broadcast(code);
   });
 
-  socket.on('playerConnect', ({ token }) => {
+  socket.on('playerConnect', function(data) {
+    const token = data.token;
     const entry = tokenMap.get(token);
     if (!entry) { socket.emit('playerError', 'Link inválido.'); return; }
     const room = rooms.get(entry.roomCode);
@@ -217,42 +227,84 @@ io.on('connection', socket => {
     if (room.hostSocketId) io.to(room.hostSocketId).emit('gameState', publicState(room, entry.roomCode));
   });
 
-  socket.on('drawCard', () => {
+  socket.on('drawCard', function() {
     const code = socket.data.roomCode;
     const idx = socket.data.playerIndex;
     if (idx === undefined) return;
     const room = rooms.get(code);
     if (!room || room.phase !== 'thinking') return;
     const p = room.players[idx];
-    if (p.cards.length >= 2 || room.pile.length === 0) return;
+    if (p.cards.length >= 2 || room.pile.length === 0 || room.players.length > 3) return;
     p.cards.push(room.pile.pop());
     broadcast(code);
   });
 
-  socket.on('submitClue', ({ clue, coord, playerIndex }) => {
+  socket.on('raiseHand', function(data) {
+    const coord = data.coord;
+    const code = socket.data.roomCode;
+    const idx = socket.data.playerIndex;
+    if (idx === undefined) return;
+    const room = rooms.get(code);
+    if (!room || room.phase !== 'thinking') return;
+    if (room.raisedHand != null) {
+      socket.emit('raiseHandError', 'Outro jogador já levantou a mão.');
+      return;
+    }
+    const p = room.players[idx];
+    if (!p || p.cards.indexOf(coord) === -1) {
+      socket.emit('raiseHandError', 'Carta inválida.');
+      return;
+    }
+    room.raisedHand = { playerIndex: idx, coord: coord };
+    broadcast(code);
+  });
+
+  socket.on('lowerHand', function() {
+    const code = socket.data.roomCode;
+    const idx = socket.data.playerIndex;
+    if (idx === undefined) return;
+    const room = rooms.get(code);
+    if (!room || !room.raisedHand || room.raisedHand.playerIndex !== idx) return;
+    room.raisedHand = null;
+    broadcast(code);
+  });
+
+  socket.on('submitClue', function(data) {
+    const clue = data.clue;
     const code = socket.data.roomCode;
     const room = rooms.get(code);
     if (!room || room.phase !== 'thinking') return;
+    if (socket.data.role !== 'player') return;
 
-    const pIdx = socket.data.role === 'player' ? socket.data.playerIndex : playerIndex;
-    if (pIdx === undefined || pIdx === null) return;
+    const pIdx = socket.data.playerIndex;
+    if (pIdx === undefined) return;
+
+    if (!room.raisedHand || room.raisedHand.playerIndex !== pIdx) {
+      socket.emit('clueError', 'Levante a mão primeiro.');
+      return;
+    }
+
+    const coord = room.raisedHand.coord;
     const p = room.players[pIdx];
-    if (!p || !p.cards.includes(coord)) {
-      socket.emit('clueError', 'Carta inválida.'); return;
+    if (!p || p.cards.indexOf(coord) === -1) {
+      socket.emit('clueError', 'Carta inválida.');
+      return;
     }
 
     const clean = clue.trim().toLowerCase();
-    if (!clean || clean.includes(' ')) { socket.emit('clueError', 'Uma única palavra.'); return; }
+    if (!clean || clean.indexOf(' ') !== -1) { socket.emit('clueError', 'Uma única palavra.'); return; }
     if (room.usedClues.has(clean)) { socket.emit('clueError', 'Dica já foi usada.'); return; }
 
     room.phase = 'guessing';
-    room.currentClue = { playerIndex: pIdx, playerName: p.name, clue: clue.trim(), coord };
+    room.currentClue = { playerIndex: pIdx, playerName: p.name, clue: clue.trim(), coord: coord };
+    room.raisedHand = null;
     room.groupGuess = null;
     room.lastResult = null;
     broadcast(code);
   });
 
-  socket.on('setGroupGuess', ({ coord }) => {
+  socket.on('setGroupGuess', function(data) {
+    const coord = data.coord;
     const code = socket.data.roomCode;
     const room = rooms.get(code);
     if (!room || room.phase !== 'guessing' || socket.data.role !== 'host') return;
@@ -260,21 +312,7 @@ io.on('connection', socket => {
     broadcast(code);
   });
 
-  // Host requests a player's card list (to fill the clue form when player has no phone)
-  socket.on('requestPlayerCards', ({ playerIndex }) => {
-    const code = socket.data.roomCode;
-    const room = rooms.get(code);
-    if (!room || socket.data.role !== 'host') return;
-    const p = room.players[playerIndex];
-    if (!p) return;
-    const cards = p.cards.map(coord => {
-      const l = coord[0], n = parseInt(coord[1]);
-      return { coord, rowWord: room.rows[l] || '?', colWord: room.cols[n] || '?' };
-    });
-    socket.emit('playerCardsForHost', { playerIndex, cards });
-  });
-
-  socket.on('confirmGuess', () => {
+  socket.on('confirmGuess', function() {
     const code = socket.data.roomCode;
     const room = rooms.get(code);
     if (!room || room.phase !== 'guessing' || !room.groupGuess || !room.currentClue) return;
@@ -289,32 +327,41 @@ io.on('connection', socket => {
     }
 
     const p = room.players[room.currentClue.playerIndex];
-    p.cards = p.cards.filter(c => c !== room.currentClue.coord);
-    // Repõe 1 carta (mantém no máximo o que o jogador já tem na mão + 1)
+    p.cards = p.cards.filter(function(c) { return c !== room.currentClue.coord; });
     if (room.pile.length > 0 && p.cards.length === 0) {
       p.cards.push(room.pile.pop());
     }
 
-    room.lastResult = { correct, coord: room.currentClue.coord, guess: room.groupGuess, clue: room.currentClue.clue };
+    room.lastResult = {
+      correct: correct,
+      coord: room.currentClue.coord,
+      guess: room.groupGuess,
+      clue: room.currentClue.clue,
+      playerName: room.currentClue.playerName,
+    };
     room.currentClue = null;
     room.groupGuess = null;
     room.phase = 'thinking';
 
-    const allEmpty = room.players.every(p => p.cards.length === 0) && room.pile.length === 0;
+    const allEmpty = room.players.every(function(pl) { return pl.cards.length === 0; }) && room.pile.length === 0;
     if (allEmpty) { endGame(code); } else { broadcast(code); }
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', function() {
     const code = socket.data.roomCode;
     if (!code) return;
     const room = rooms.get(code);
     if (!room) return;
     if (socket.data.role === 'player' && socket.data.playerIndex !== undefined) {
-      room.players[socket.data.playerIndex].playerSocketId = null;
+      const idx = socket.data.playerIndex;
+      room.players[idx].playerSocketId = null;
+      if (room.raisedHand && room.raisedHand.playerIndex === idx) {
+        room.raisedHand = null;
+      }
       if (room.hostSocketId) io.to(room.hostSocketId).emit('gameState', publicState(room, code));
     }
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Entre Linhas → http://localhost:${PORT}`));
+server.listen(PORT, function() { console.log('Entre Linhas → http://localhost:' + PORT); });

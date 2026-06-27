@@ -7,172 +7,256 @@
 <script src="/socket.io/socket.io.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-:root{--rosa:#c94070;--verde:#2e9e5b;--escuro:#2a1a0e;--amarelo:#f5c842;}
+:root{
+  --mesa:#1C1409;
+  --painel:#231A0C;
+  --borda:#3D2B14;
+  --ouro:#F5C842;
+  --ouro-dim:#7A6118;
+  --rosa:#E8456A;
+  --rosa-dim:#7A1F33;
+  --verde:#27AE60;
+  --verde-dim:#145E33;
+  --creme:#F5F0E8;
+  --creme-dim:#8A7F70;
+}
 body{
   font-family:'Segoe UI',system-ui,sans-serif;
-  background:#f5f0e8;color:var(--escuro);
+  background:var(--mesa);color:var(--creme);
   min-height:100dvh;display:flex;flex-direction:column;
+  background-image:radial-gradient(ellipse at top,#2a1e08 0%,var(--mesa) 60%);
 }
 
+/* ── HEADER ── */
 .topo{
-  background:var(--escuro);color:#fff;padding:14px 18px;
+  background:linear-gradient(to right,#120d04,#1e1509,#120d04);
+  border-bottom:1px solid var(--borda);
+  padding:12px 16px;
   display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
 }
-.topo-nome{font-weight:900;font-size:1.1rem;}
-.topo-status{font-size:.78rem;color:#aaa;}
+.topo-esq{display:flex;align-items:center;gap:10px;}
+.av{
+  width:34px;height:34px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.85rem;font-weight:800;color:#fff;flex-shrink:0;
+  position:relative;
+}
+.av.ring::after{
+  content:'';position:absolute;inset:-3px;border-radius:50%;
+  border:2px solid var(--ouro);
+  animation:ringPulse 1s ease-in-out infinite;
+}
+@keyframes ringPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(1.2);}}
+.topo-nome{font-weight:800;font-size:1rem;line-height:1.2;}
+.topo-status{font-size:.72rem;color:var(--creme-dim);margin-top:2px;}
+.topo-pts{
+  background:rgba(245,200,66,.1);border:1px solid var(--ouro-dim);
+  border-radius:8px;padding:4px 12px;
+  font-weight:800;color:var(--ouro);font-size:.95rem;
+}
 
+/* ── CORPO ── */
 .corpo{flex:1;padding:16px;display:flex;flex-direction:column;gap:14px;}
 
-/* Estado */
-.estado-panel{
-  border-radius:12px;padding:14px;text-align:center;
+/* ── TELAS DE ESTADO GERAL ── */
+.tela-centro{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:14px;text-align:center;padding:24px;
 }
-.estado-pensando{background:#e8f5ee;border:2px solid var(--verde);}
-.estado-adivinhando{background:#fff3f6;border:2px solid var(--rosa);}
-.estado-title{font-weight:700;font-size:.95rem;}
-.estado-dica{font-size:1.5rem;font-weight:900;color:var(--rosa);margin-top:6px;word-break:break-word;}
-.estado-de{font-size:.78rem;color:#888;margin-top:4px;}
+.spinner{
+  width:40px;height:40px;border:3px solid var(--borda);
+  border-top-color:var(--ouro);border-radius:50%;
+  animation:spin 1s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.tela-titulo{font-size:1.1rem;font-weight:700;color:var(--creme);}
+.tela-sub{font-size:.85rem;color:var(--creme-dim);line-height:1.5;}
+.err-msg{color:var(--rosa);font-size:.85rem;font-weight:600;}
 
-/* Cartas */
-.cartas-titulo{font-size:.75rem;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.4px;}
+/* ── FASE GUESSING ── */
+.guess-panel{
+  background:rgba(232,69,106,.08);border:1px solid var(--rosa-dim);
+  border-radius:16px;padding:18px;text-align:center;
+}
+.guess-label{font-size:.68rem;color:var(--creme-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.guess-de{font-size:.82rem;color:var(--creme-dim);margin-bottom:8px;}
+.guess-de strong{color:var(--rosa);}
+.guess-word{
+  font-size:2.4rem;font-weight:900;color:var(--ouro);
+  word-break:break-word;line-height:1.1;
+  text-shadow:0 2px 14px rgba(245,200,66,.25);
+}
+.guess-hint{font-size:.78rem;color:var(--creme-dim);margin-top:10px;line-height:1.5;}
+
+/* ── CARTAS ── */
+.sec-titulo{font-size:.68rem;font-weight:800;color:var(--ouro-dim);text-transform:uppercase;letter-spacing:1.5px;}
+
 .carta{
-  background:#fff;border-radius:14px;padding:18px;
-  box-shadow:0 2px 12px rgba(0,0,0,.08);
-  border:2px solid #e0d8cc;
+  background:var(--painel);border:1px solid var(--borda);
+  border-radius:16px;padding:18px;
+  box-shadow:0 4px 20px rgba(0,0,0,.4);
+  transition:all .2s;position:relative;
 }
-.carta.selecionada{border-color:var(--rosa);box-shadow:0 0 0 3px rgba(201,64,112,.2);}
-.carta-coord{font-size:2rem;font-weight:900;color:var(--rosa);line-height:1;}
-.carta-palavras{margin-top:8px;font-size:1rem;color:#444;}
-.carta-palavras strong{color:var(--escuro);font-size:1.05rem;}
-.sep{color:#bbb;margin:0 4px;}
+.carta.clicavel{cursor:pointer;}
+.carta.clicavel:active{transform:scale(.97);}
+.carta.selecionada{
+  border-color:var(--ouro);
+  background:rgba(245,200,66,.07);
+  box-shadow:0 0 0 2px var(--ouro-dim),0 6px 24px rgba(0,0,0,.4);
+}
+.carta.bloqueada{opacity:.5;}
+.carta-coord{font-size:2.2rem;font-weight:900;color:var(--ouro);line-height:1;letter-spacing:-1px;}
+.carta-palavras{margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.carta-palavra{
+  background:rgba(255,255,255,.07);border:1px solid var(--borda);
+  border-radius:8px;padding:5px 10px;
+  font-size:.9rem;font-weight:600;color:var(--creme);
+}
+.carta-sep{color:var(--ouro-dim);font-size:.8rem;font-weight:700;}
+.carta-hint{font-size:.68rem;color:var(--creme-dim);margin-top:10px;}
 
-/* Dar dica */
-.dar-dica-section{display:flex;flex-direction:column;gap:8px;}
-.dar-dica-section label{font-size:.82rem;font-weight:600;color:#555;}
-.dica-row{display:flex;gap:8px;}
-.dica-row input{
-  flex:1;padding:12px 14px;border:2px solid #ddd;border-radius:10px;
+/* ── MÃO LEVANTADA: formulário inline ── */
+.dica-form{
+  background:rgba(245,200,66,.06);border:1px solid var(--ouro-dim);
+  border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px;
+}
+.dica-form-titulo{font-size:.72rem;color:var(--ouro-dim);text-transform:uppercase;letter-spacing:1px;}
+.dica-form-carta{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.05);border-radius:10px;padding:10px 12px;
+}
+.dica-form-coord{font-size:1.4rem;font-weight:900;color:var(--ouro);}
+.dica-form-palavras{font-size:.82rem;color:var(--creme-dim);}
+.dica-input{
+  padding:13px 14px;border:1px solid var(--borda);border-radius:12px;
   font-size:1rem;outline:none;
+  background:rgba(255,255,255,.07);color:var(--creme);width:100%;
 }
-.dica-row input:focus{border-color:var(--rosa);}
-button{
-  padding:12px 18px;border:none;border-radius:10px;
-  font-size:.9rem;font-weight:700;cursor:pointer;
+.dica-input::placeholder{color:var(--creme-dim);}
+.dica-input:focus{border-color:var(--ouro);background:rgba(255,255,255,.1);}
+.err{color:var(--rosa);font-size:.8rem;font-weight:600;}
+.btn-revelar{
+  background:var(--rosa);color:#fff;
+  border-radius:12px;padding:14px;font-size:1rem;font-weight:800;
+  border:none;cursor:pointer;width:100%;transition:all .15s;
 }
-.btn-rosa{background:var(--rosa);color:#fff;}
-.btn-verde{background:var(--verde);color:#fff;}
-.btn-outline{background:transparent;border:2px solid var(--rosa);color:var(--rosa);}
-.btn-full{width:100%;}
-button:disabled{opacity:.4;cursor:default;}
-.err{color:#c00;font-size:.82rem;font-weight:600;margin-top:4px;}
+.btn-revelar:hover:not(:disabled){background:#f05580;box-shadow:0 0 16px rgba(232,69,106,.4);}
+.btn-revelar:active{transform:scale(.97);}
+.btn-revelar:disabled{opacity:.35;cursor:default;}
+.btn-cancelar{
+  background:transparent;border:1px solid var(--borda);color:var(--creme-dim);
+  border-radius:12px;padding:11px;font-size:.88rem;font-weight:600;
+  cursor:pointer;width:100%;transition:all .15s;
+}
+.btn-cancelar:hover{border-color:var(--creme-dim);color:var(--creme);}
 
-/* Pedir carta */
-.pedir-section{text-align:center;padding:4px 0;}
-.pedir-info{font-size:.8rem;color:#888;margin-top:6px;}
+/* ── AGUARDANDO OUTRO ── */
+.wait-outro{
+  background:rgba(255,255,255,.04);border:1px dashed var(--borda);
+  border-radius:16px;padding:20px;text-align:center;
+}
+.wait-outro-titulo{font-size:.95rem;font-weight:700;color:var(--ouro);margin-bottom:6px;}
+.wait-outro-sub{font-size:.8rem;color:var(--creme-dim);line-height:1.5;}
+.wait-cartas{font-size:.75rem;color:var(--borda);margin-top:12px;}
 
-/* Overlay: selecionar carta */
+/* ── PEDIR CARTA ── */
+.pedir-section{text-align:center;}
+.btn-pedir{
+  background:transparent;border:1px solid var(--borda);color:var(--creme-dim);
+  border-radius:12px;padding:12px 20px;font-size:.88rem;font-weight:600;
+  cursor:pointer;width:100%;transition:all .15s;
+}
+.btn-pedir:hover{border-color:var(--ouro-dim);color:var(--ouro);}
+.pedir-hint{font-size:.72rem;color:var(--borda);margin-top:6px;}
+
+/* ── OVERLAY: escolher carta ── */
 #overlay-sel{
-  display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
-  z-index:50;align-items:center;justify-content:center;padding:20px;
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.75);z-index:50;
+  align-items:flex-end;justify-content:center;padding:0;
 }
 #overlay-sel.vis{display:flex;}
 .sel-modal{
-  background:#fff;border-radius:16px;padding:24px;
-  max-width:340px;width:100%;position:relative;
+  background:var(--painel);border:1px solid var(--borda);
+  border-top-left-radius:24px;border-top-right-radius:24px;
+  padding:24px;width:100%;max-width:480px;position:relative;
+  animation:slideUp .3s cubic-bezier(.34,1.56,.64,1);
 }
-.sel-modal h3{margin-bottom:14px;}
+@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.sel-modal h3{font-size:1rem;margin-bottom:16px;color:var(--creme);}
 .sel-card-btn{
-  width:100%;background:#f9f9f9;border:2px solid #ddd;border-radius:10px;
-  padding:14px;margin-bottom:8px;cursor:pointer;text-align:left;
-  display:flex;flex-direction:column;gap:4px;
+  width:100%;background:rgba(255,255,255,.05);border:1px solid var(--borda);
+  border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;
+  text-align:left;display:flex;align-items:center;gap:12px;
+  color:var(--creme);transition:all .15s;
 }
-.sel-card-btn:hover{border-color:var(--rosa);}
-.sel-coord{font-size:1.3rem;font-weight:900;color:var(--rosa);}
-.sel-palavras{font-size:.88rem;color:#444;}
+.sel-card-btn:hover{border-color:var(--ouro);background:rgba(245,200,66,.07);}
+.sel-coord{font-size:1.5rem;font-weight:900;color:var(--ouro);}
+.sel-palavras{font-size:.85rem;color:var(--creme-dim);}
 .btn-x{
-  position:absolute;top:12px;right:12px;
-  background:transparent;border:none;color:#999;
-  font-size:1.2rem;cursor:pointer;
+  position:absolute;top:14px;right:16px;
+  background:transparent;border:none;color:var(--creme-dim);
+  font-size:1.2rem;cursor:pointer;padding:4px;line-height:1;
 }
+.btn-x:hover{color:var(--creme);}
 
-/* Sem jogo */
-.sem-jogo{
-  flex:1;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;
-  gap:12px;text-align:center;padding:24px;
-}
-.sem-jogo h2{font-size:1.2rem;}
-.sem-jogo p{font-size:.9rem;color:#888;}
-
-/* Aguardando início */
-.aguardando{
-  flex:1;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;
-  gap:10px;text-align:center;padding:24px;
-}
-.spinner{width:36px;height:36px;border:3px solid #ddd;border-top-color:var(--rosa);border-radius:50%;animation:spin 1s linear infinite;}
-@keyframes spin{to{transform:rotate(360deg);}}
+/* ── AVATARES ── */
+.av0{background:#c94070;}.av1{background:#2e9e5b;}.av2{background:#1e6fc4;}
+.av3{background:#f5a623;}.av4{background:#9b59b6;}.av5{background:#16a085;}
+.av6{background:#e74c3c;}.av7{background:#2980b9;}
 </style>
 </head>
 <body>
 
-<div id="sem-jogo" class="sem-jogo">
-  <h2>Entre Linhas</h2>
-  <p>Aguardando conexão...</p>
+<!-- Conectando -->
+<div id="tela-conectando" class="tela-centro">
   <div class="spinner"></div>
-  <div id="player-err" style="color:#c00;font-size:.85rem;"></div>
+  <div class="tela-titulo">Conectando...</div>
+  <div id="player-err" class="err-msg"></div>
 </div>
 
-<div id="aguardando" class="aguardando" style="display:none">
-  <div class="spinner"></div>
-  <h2 id="agt-nome"></h2>
-  <p>Aguardando o jogo começar...</p>
-</div>
-
-<div id="jogo-tela" style="display:none;flex:1;flex-direction:column;">
+<!-- Aguardando início -->
+<div id="tela-lobby" style="display:none">
   <div class="topo">
-    <div>
-      <div class="topo-nome" id="topo-nome">Jogador</div>
-      <div class="topo-status" id="topo-status">Pensando...</div>
-    </div>
-    <div id="topo-pontos" style="font-weight:700;color:var(--amarelo);"></div>
-  </div>
-
-  <div class="corpo">
-    <!-- Estado atual do jogo -->
-    <div id="estado-panel" style="display:none"></div>
-
-    <!-- Minhas cartas -->
-    <div class="cartas-titulo">Minhas Cartas</div>
-    <div id="minhas-cartas"></div>
-
-    <!-- Dar dica (aparece quando selecionou carta) -->
-    <div id="dar-dica-section" style="display:none" class="dar-dica-section">
-      <label>Palavra que conecta as duas (uma só):</label>
-      <div class="dica-row">
-        <input id="dica-input" type="text" placeholder="Sua dica..." maxlength="30"
-               autocomplete="off" autocorrect="off" spellcheck="false"
-               onkeydown="if(event.key==='Enter')enviarDica()">
-        <button class="btn-rosa" onclick="enviarDica()">→</button>
+    <div class="topo-esq">
+      <div class="av av0" id="av-lobby">?</div>
+      <div>
+        <div class="topo-nome" id="lobby-nome">Jogador</div>
+        <div class="topo-status">Aguardando o jogo começar...</div>
       </div>
-      <div id="dica-err" class="err"></div>
-      <button class="btn-outline btn-full" style="margin-top:4px" onclick="cancelarDica()">Cancelar</button>
     </div>
-
-    <!-- Pedir mais carta -->
-    <div id="pedir-section" class="pedir-section" style="display:none">
-      <button class="btn-outline btn-full" onclick="pedirCarta()">Pedir 2ª carta</button>
-      <div class="pedir-info">Você tem 1 carta. Pode pedir mais uma (máx. 2).</div>
-    </div>
+  </div>
+  <div class="tela-centro" style="flex:1">
+    <div class="spinner"></div>
+    <div class="tela-sub">O host vai iniciar a partida em breve.</div>
   </div>
 </div>
 
-<!-- Overlay: escolher qual carta usar quando tem 2 -->
+<!-- Jogo -->
+<div id="tela-jogo" style="display:none;flex-direction:column;flex:1">
+  <div class="topo">
+    <div class="topo-esq">
+      <div class="av" id="av-jogo">?</div>
+      <div>
+        <div class="topo-nome" id="jogo-nome">Jogador</div>
+        <div class="topo-status" id="jogo-status">Pensando...</div>
+      </div>
+    </div>
+    <div class="topo-pts" id="jogo-pts">0 pts</div>
+  </div>
+
+  <div class="corpo" id="corpo-jogo"></div>
+</div>
+
+<!-- Overlay: escolher carta (2 na mão) -->
 <div id="overlay-sel">
   <div class="sel-modal">
     <button class="btn-x" onclick="fecharOverlaySel()">✕</button>
-    <h3>Qual carta usar?</h3>
+    <h3>Com qual carta dar a dica?</h3>
     <div id="sel-cartas"></div>
+    <button class="btn-cancelar" style="margin-top:4px" onclick="fecharOverlaySel()">Cancelar</button>
   </div>
 </div>
 
@@ -180,11 +264,9 @@ button:disabled{opacity:.4;cursor:default;}
 const socket = io();
 const token = location.pathname.split('/p/')[1];
 let myState = null;
-let cartaSelecionada = null;
+const AVATAR_COLORS = ['#c94070','#2e9e5b','#1e6fc4','#f5a623','#9b59b6','#16a085','#e74c3c','#2980b9'];
 
-socket.on('connect', () => {
-  socket.emit('playerConnect', { token });
-});
+socket.on('connect', () => { socket.emit('playerConnect', { token }); });
 
 socket.on('playerError', (msg) => {
   document.getElementById('player-err').textContent = msg;
@@ -197,135 +279,249 @@ socket.on('myState', (state) => {
 
 function render() {
   if (!myState) return;
+  const s = myState;
 
-  document.getElementById('sem-jogo').style.display = 'none';
+  // Conectando → fora
+  document.getElementById('tela-conectando').style.display = 'none';
 
-  if (myState.phase === 'lobby') {
-    document.getElementById('aguardando').style.display = 'flex';
-    document.getElementById('jogo-tela').style.display = 'none';
-    document.getElementById('agt-nome').textContent = myState.name;
+  const avColor = AVATAR_COLORS[s.playerIndex % AVATAR_COLORS.length];
+  const inicial = (s.name || '?')[0].toUpperCase();
+
+  if (s.phase === 'lobby') {
+    document.getElementById('tela-lobby').style.display = 'flex';
+    document.getElementById('tela-lobby').style.flexDirection = 'column';
+    document.getElementById('tela-jogo').style.display = 'none';
+    const avL = document.getElementById('av-lobby');
+    avL.textContent = inicial;
+    avL.style.background = avColor;
+    document.getElementById('lobby-nome').textContent = s.name;
     return;
   }
 
-  document.getElementById('aguardando').style.display = 'none';
-  document.getElementById('jogo-tela').style.display = 'flex';
+  document.getElementById('tela-lobby').style.display = 'none';
+  const jogoEl = document.getElementById('tela-jogo');
+  jogoEl.style.display = 'flex';
 
-  // Topo
-  document.getElementById('topo-nome').textContent = myState.name;
-  const status = myState.isGiving ? '💬 Você está dando a dica!' :
-    myState.phase === 'guessing' ? '🤔 Grupo adivinhando...' : '🧠 Pensando...';
-  document.getElementById('topo-status').textContent = status;
-  if (myState.score !== undefined) {
-    document.getElementById('topo-pontos').textContent = `${myState.score} pts`;
+  // Header
+  const avJ = document.getElementById('av-jogo');
+  avJ.textContent = inicial;
+  avJ.style.background = avColor;
+  avJ.className = 'av' + (s.hasRaisedHand ? ' ring' : '');
+  document.getElementById('jogo-nome').textContent = s.name;
+  document.getElementById('jogo-pts').textContent = s.score + ' pts';
+
+  let statusText = '🧠 Pensando...';
+  if (s.phase === 'guessing') {
+    statusText = s.isGiving ? '💬 Sua dica está em jogo!' : '🤔 Adivinhando...';
+  } else if (s.hasRaisedHand) {
+    statusText = '✋ Dando a dica...';
+  } else if (s.raisedHand) {
+    statusText = '⏳ Aguardando ' + esc(s.raisedHand.playerName) + '...';
   }
+  document.getElementById('jogo-status').textContent = statusText;
 
-  // Estado atual
-  const estadoEl = document.getElementById('estado-panel');
-  if (myState.phase === 'guessing' && myState.currentClue) {
-    const c = myState.currentClue;
-    const isMinha = c.playerIndex === myState.playerIndex;
-    if (isMinha) {
-      estadoEl.className = 'estado-panel estado-adivinhando';
-      estadoEl.innerHTML = `<div class="estado-title">Você deu a dica:</div><div class="estado-dica">"${esc(c.clue)}"</div><div class="estado-de">O grupo está adivinhando na tela principal.</div>`;
-    } else {
-      estadoEl.className = 'estado-panel estado-adivinhando';
-      estadoEl.innerHTML = `<div class="estado-title">Dica de ${esc(c.playerName)}:</div><div class="estado-dica">"${esc(c.clue)}"</div><div class="estado-de">Discutam e adivinhem na tela principal.</div>`;
-    }
-    estadoEl.style.display = 'block';
-  } else {
-    estadoEl.style.display = 'none';
-  }
-
-  // Minhas cartas
-  const cartasEl = document.getElementById('minhas-cartas');
-  if (!myState.cards || myState.cards.length === 0) {
-    cartasEl.innerHTML = '<div style="color:#aaa;font-size:.9rem;text-align:center;padding:12px 0">Sem cartas. Aguardando...</div>';
-  } else {
-    const podeDarDica = myState.phase === 'thinking';
-    cartasEl.innerHTML = myState.cards.map(card => `
-      <div class="carta ${cartaSelecionada === card.coord ? 'selecionada' : ''}"
-           onclick="${podeDarDica ? `selecionarCarta('${card.coord}')` : ''}">
-        <div class="carta-coord">${card.coord}</div>
-        <div class="carta-palavras">
-          <strong>${esc(card.rowWord)}</strong>
-          <span class="sep">×</span>
-          <strong>${esc(card.colWord)}</strong>
-        </div>
-        ${podeDarDica ? `<div style="font-size:.75rem;color:#aaa;margin-top:8px">Toque para dar dica com esta carta</div>` : ''}
-      </div>
-    `).join('');
-  }
-
-  // Dar dica section
-  const darDicaEl = document.getElementById('dar-dica-section');
-  if (cartaSelecionada && myState.phase === 'thinking') {
-    darDicaEl.style.display = 'flex';
-  } else {
-    darDicaEl.style.display = 'none';
-    if (myState.phase !== 'thinking') cartaSelecionada = null;
-  }
-
-  // Pedir carta
-  const pedirEl = document.getElementById('pedir-section');
-  pedirEl.style.display = myState.canDraw ? 'block' : 'none';
+  renderCorpo();
 }
 
-function selecionarCarta(coord) {
+function renderCorpo() {
+  const s = myState;
+  const corpo = document.getElementById('corpo-jogo');
+  let html = '';
+
+  // ── Fase GUESSING ──
+  if (s.phase === 'guessing' && s.currentClue) {
+    const c = s.currentClue;
+    if (s.isGiving) {
+      html += `
+        <div class="guess-panel">
+          <div class="guess-label">Você deu a dica</div>
+          <div class="guess-word">"${esc(c.clue)}"</div>
+          <div class="guess-hint">O grupo está adivinhando na tela principal.</div>
+        </div>
+      `;
+    } else {
+      html += `
+        <div class="guess-panel">
+          <div class="guess-label">Dica em jogo</div>
+          <div class="guess-de">Dica de <strong>${esc(c.playerName)}</strong>:</div>
+          <div class="guess-word">"${esc(c.clue)}"</div>
+          <div class="guess-hint">Discutam em grupo e escolham a posição na tela principal.</div>
+        </div>
+      `;
+    }
+    corpo.innerHTML = html;
+    return;
+  }
+
+  // ── Fase ENDED ──
+  if (s.phase === 'ended') {
+    html += `
+      <div class="guess-panel" style="text-align:center">
+        <div style="font-size:2rem;margin-bottom:8px">🏁</div>
+        <div style="font-size:1.1rem;font-weight:700;color:var(--ouro)">Fim de Jogo!</div>
+        <div style="font-size:.85rem;color:var(--creme-dim);margin-top:6px">Pontuação: ${s.score} pts</div>
+      </div>
+    `;
+    corpo.innerHTML = html;
+    return;
+  }
+
+  // ── Fase THINKING ──
+
+  // Outro levantou a mão
+  if (s.raisedHand && !s.hasRaisedHand) {
+    html += `
+      <div class="wait-outro">
+        <div class="wait-outro-titulo">✋ ${esc(s.raisedHand.playerName)} está dando a dica...</div>
+        <div class="wait-outro-sub">Aguarde. Quando a dica for revelada, o grupo vai adivinhar juntos.</div>
+      </div>
+    `;
+    // Mostra cartas sem interação
+    if (s.cards && s.cards.length > 0) {
+      html += `<div class="sec-titulo" style="margin-top:4px">Suas cartas</div>`;
+      s.cards.forEach(card => {
+        html += `
+          <div class="carta bloqueada">
+            <div class="carta-coord">${card.coord}</div>
+            <div class="carta-palavras">
+              <span class="carta-palavra">${esc(card.rowWord)}</span>
+              <span class="carta-sep">×</span>
+              <span class="carta-palavra">${esc(card.colWord)}</span>
+            </div>
+          </div>
+        `;
+      });
+    }
+    corpo.innerHTML = html;
+    return;
+  }
+
+  // Eu levantei a mão — mostra formulário da carta escolhida
+  if (s.hasRaisedHand) {
+    // Qual carta está selecionada? Precisamos saber — guardamos no estado local
+    const carta = cartaSelecionadaCoord ? s.cards.find(c => c.coord === cartaSelecionadaCoord) : s.cards[0];
+    if (carta) {
+      html += `
+        <div class="dica-form" id="dica-form">
+          <div class="dica-form-titulo">✋ Dando a dica</div>
+          <div class="dica-form-carta">
+            <div class="dica-form-coord">${carta.coord}</div>
+            <div class="dica-form-palavras">${esc(carta.rowWord)} × ${esc(carta.colWord)}</div>
+          </div>
+          <input class="dica-input" id="dica-input" type="text"
+                 placeholder="Uma palavra que conecta as duas..."
+                 maxlength="30" autocomplete="off" autocorrect="off" spellcheck="false"
+                 onkeydown="if(event.key==='Enter')enviarDica()">
+          <div id="dica-err" class="err"></div>
+          <button class="btn-revelar" onclick="enviarDica()">Revelar Dica →</button>
+          <button class="btn-cancelar" onclick="baixarMao()">Cancelar — deixar outro dar</button>
+        </div>
+      `;
+    }
+    corpo.innerHTML = html;
+    setTimeout(() => document.getElementById('dica-input') && document.getElementById('dica-input').focus(), 80);
+    return;
+  }
+
+  // Ninguém levantou a mão — mostrar cartas para interação
+  if (!s.cards || s.cards.length === 0) {
+    html += `
+      <div class="wait-outro">
+        <div class="wait-outro-titulo">Sem cartas</div>
+        <div class="wait-outro-sub">Aguardando novas cartas da pilha...</div>
+      </div>
+    `;
+  } else {
+    html += `<div class="sec-titulo">Minhas cartas — toque para levantar a mão</div>`;
+    s.cards.forEach(card => {
+      html += `
+        <div class="carta clicavel" onclick="levantarMao('${card.coord}')">
+          <div class="carta-coord">${card.coord}</div>
+          <div class="carta-palavras">
+            <span class="carta-palavra">${esc(card.rowWord)}</span>
+            <span class="carta-sep">×</span>
+            <span class="carta-palavra">${esc(card.colWord)}</span>
+          </div>
+          <div class="carta-hint">Toque para levantar a mão e dar a dica com esta carta ✋</div>
+        </div>
+      `;
+    });
+  }
+
+  // Pedir 2ª carta
+  if (s.canDraw) {
+    html += `
+      <div class="pedir-section">
+        <button class="btn-pedir" onclick="pedirCarta()">+ Pedir 2ª carta</button>
+        <div class="pedir-hint">Você pode ter até 2 cartas na mão (máx. 3 jogadores)</div>
+      </div>
+    `;
+  }
+
+  corpo.innerHTML = html;
+}
+
+// ── AÇÕES ──────────────────────────────────
+let cartaSelecionadaCoord = null;
+
+function levantarMao(coord) {
+  if (!myState) return;
   if (myState.cards.length > 1) {
-    // Tem 2 cartas - mostra overlay para escolher
+    // Tem 2 cartas — mostra modal para escolher
     const sel = document.getElementById('sel-cartas');
     sel.innerHTML = myState.cards.map(card => `
       <button class="sel-card-btn" onclick="escolherCarta('${card.coord}')">
         <div class="sel-coord">${card.coord}</div>
-        <div class="sel-palavras"><strong>${esc(card.rowWord)}</strong> × <strong>${esc(card.colWord)}</strong></div>
+        <div class="sel-palavras">${esc(card.rowWord)} × ${esc(card.colWord)}</div>
       </button>
     `).join('');
     document.getElementById('overlay-sel').classList.add('vis');
   } else {
-    cartaSelecionada = coord;
-    render();
-    setTimeout(() => document.getElementById('dica-input')?.focus(), 50);
+    cartaSelecionadaCoord = coord;
+    socket.emit('raiseHand', { coord });
   }
 }
 
 function escolherCarta(coord) {
-  cartaSelecionada = coord;
   fecharOverlaySel();
-  render();
-  setTimeout(() => document.getElementById('dica-input')?.focus(), 50);
+  cartaSelecionadaCoord = coord;
+  socket.emit('raiseHand', { coord });
 }
 
 function fecharOverlaySel() {
   document.getElementById('overlay-sel').classList.remove('vis');
 }
 
-function cancelarDica() {
-  cartaSelecionada = null;
-  document.getElementById('dica-input').value = '';
-  document.getElementById('dica-err').textContent = '';
-  render();
+function baixarMao() {
+  cartaSelecionadaCoord = null;
+  document.getElementById('dica-err') && (document.getElementById('dica-err').textContent = '');
+  socket.emit('lowerHand');
 }
 
 function enviarDica() {
   const inp = document.getElementById('dica-input');
   const errEl = document.getElementById('dica-err');
+  if (!inp) return;
   const clue = inp.value.trim();
   if (!clue) { errEl.textContent = 'Digite uma dica.'; return; }
   if (clue.includes(' ')) { errEl.textContent = 'Apenas uma palavra!'; return; }
-  if (!cartaSelecionada) { errEl.textContent = 'Selecione uma carta.'; return; }
   errEl.textContent = '';
-  socket.emit('submitClue', { clue, coord: cartaSelecionada });
-  cartaSelecionada = null;
+  socket.emit('submitClue', { clue });
   inp.value = '';
 }
 
 socket.on('clueError', (msg) => {
-  document.getElementById('dica-err').textContent = msg;
+  const el = document.getElementById('dica-err');
+  if (el) el.textContent = msg;
 });
 
-function pedirCarta() {
-  socket.emit('drawCard');
-}
+socket.on('raiseHandError', (msg) => {
+  // Outro levantou antes — estado já vai atualizar via myState
+  cartaSelecionadaCoord = null;
+  fecharOverlaySel();
+});
+
+function pedirCarta() { socket.emit('drawCard'); }
 
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
