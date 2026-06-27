@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Entre Linhas</title>
 <script src="/socket.io/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -81,32 +82,66 @@ button:disabled{opacity:.35;cursor:default;transform:none;}
 
 /* ── LINKS ── */
 #links-screen{
-  display:none;flex-direction:column;align-items:center;justify-content:center;
-  min-height:100vh;gap:20px;padding:24px;
+  display:none;flex-direction:column;align-items:center;
+  min-height:100vh;gap:20px;padding:28px 24px;
+  overflow-y:auto;
   background:radial-gradient(ellipse at center,#2a1e08 0%,var(--mesa) 70%);
 }
 #links-screen.active{display:flex;}
 .links-card{
   background:rgba(255,255,255,.06);border:1px solid var(--borda);
-  border-radius:20px;padding:28px;width:100%;max-width:540px;
+  border-radius:20px;padding:28px;width:100%;max-width:840px;
 }
 .links-card h2{margin-bottom:6px;font-size:1.2rem;}
-.links-card p{font-size:.85rem;color:var(--creme-dim);margin-bottom:20px;line-height:1.5;}
+.links-card p{font-size:.85rem;color:var(--creme-dim);margin-bottom:24px;line-height:1.5;}
 
-.player-link-item{
-  background:rgba(255,255,255,.05);border:1px solid var(--borda);
-  border-radius:12px;padding:12px 14px;margin-bottom:10px;
-  display:flex;align-items:center;gap:10px;transition:border-color .2s;
+/* Grid de QR cards */
+#player-links{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(188px,1fr));
+  gap:16px;
 }
-.player-link-item:has(.connected-dot.on){border-color:var(--verde-dim);}
-.link-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#fff;flex-shrink:0;}
-.link-info{flex:1;min-width:0;}
-.link-name{font-weight:700;font-size:.9rem;}
-.link-url{font-size:.7rem;color:var(--creme-dim);word-break:break-all;font-family:monospace;margin-top:2px;}
-.btn-copy{background:rgba(255,255,255,.1);color:var(--creme);border:1px solid var(--borda);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.75rem;font-weight:600;flex-shrink:0;transition:all .15s;}
-.btn-copy:hover{background:rgba(245,200,66,.15);border-color:var(--ouro-dim);color:var(--ouro);}
+
+.player-qr-card{
+  background:rgba(255,255,255,.05);border:1px solid var(--borda);
+  border-radius:14px;padding:16px;
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  transition:border-color .25s;
+}
+.player-qr-card:has(.connected-dot.on){border-color:var(--verde-dim);}
+
+.qr-header{
+  width:100%;display:flex;align-items:center;justify-content:space-between;
+}
+.link-av{
+  width:30px;height:30px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.78rem;font-weight:800;color:#fff;flex-shrink:0;
+}
+.qr-player-name{font-weight:800;font-size:.92rem;flex:1;padding:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .connected-dot{width:9px;height:9px;border-radius:50%;background:var(--borda);flex-shrink:0;transition:background .3s;}
 .connected-dot.on{background:var(--verde);box-shadow:0 0 6px rgba(39,174,96,.6);}
+
+/* QR code box — fundo claro para leitura do QR */
+.qr-box{
+  background:#F5F0E8;border-radius:10px;padding:8px;
+  display:flex;align-items:center;justify-content:center;
+  width:164px;height:164px;flex-shrink:0;
+}
+.qr-box canvas,.qr-box img{display:block;}
+
+.qr-url{
+  font-size:.6rem;color:var(--creme-dim);font-family:monospace;
+  text-align:center;word-break:break-all;line-height:1.4;
+  max-width:100%;
+}
+.btn-copy{
+  background:rgba(255,255,255,.08);color:var(--creme);
+  border:1px solid var(--borda);border-radius:8px;
+  padding:7px 0;cursor:pointer;font-size:.78rem;font-weight:700;
+  width:100%;transition:all .15s;
+}
+.btn-copy:hover{background:rgba(245,200,66,.15);border-color:var(--ouro-dim);color:var(--ouro);}
 
 /* ── JOGO LAYOUT ── */
 #jogo{display:none;height:100vh;flex-direction:column;}
@@ -244,17 +279,17 @@ button:disabled{opacity:.35;cursor:default;transform:none;}
 }
 @keyframes ringPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(1.15);}}
 .chip-info{flex:1;min-width:0;}
-.chip-name{font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.chip-cards{font-size:.68rem;color:var(--creme-dim);}
-.chip-rh{font-size:.65rem;color:var(--ouro);font-weight:700;}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--borda);flex-shrink:0;}
+.chip-name{font-size:.88rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--creme);}
+.chip-cards{font-size:.72rem;color:var(--creme-dim);margin-top:1px;}
+.chip-rh{font-size:.72rem;color:var(--ouro);font-weight:700;margin-top:1px;}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--borda);flex-shrink:0;}
 .dot.on{background:var(--verde);}
 
 /* Dicas usadas */
 .tags{display:flex;flex-wrap:wrap;gap:5px;}
 .tag{
-  background:rgba(255,255,255,.06);color:var(--creme-dim);
-  padding:3px 9px;border-radius:20px;font-size:.7rem;
+  background:rgba(255,255,255,.07);color:var(--creme-dim);
+  padding:4px 10px;border-radius:20px;font-size:.74rem;font-weight:600;
   text-decoration:line-through;border:1px solid var(--borda);
 }
 
@@ -272,8 +307,12 @@ button:disabled{opacity:.35;cursor:default;transform:none;}
   width:var(--cell);height:var(--cell);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
 }
-.ax-l{font-size:1rem;font-weight:900;color:var(--ouro);}
-.ax-w{font-size:.58rem;color:var(--creme-dim);margin-top:3px;word-break:break-word;max-width:66px;line-height:1.2;text-align:center;}
+.ax-l{font-size:1.1rem;font-weight:900;color:var(--ouro);}
+.ax-w{
+  font-size:.66rem;font-weight:700;color:var(--creme);
+  margin-top:4px;word-break:break-word;max-width:68px;
+  line-height:1.25;text-align:center;letter-spacing:.1px;
+}
 .cell{
   width:var(--cell);height:var(--cell);
   border-radius:10px;border:1px solid var(--borda);
@@ -292,13 +331,13 @@ button:disabled{opacity:.35;cursor:default;transform:none;}
   transform:scale(1.04);
 }
 .cell.colocada{
-  background:rgba(39,174,96,.12);border-color:rgba(39,174,96,.4);
+  background:rgba(39,174,96,.14);border-color:rgba(39,174,96,.5);
   cursor:default;
 }
 .cell.off{cursor:default;}
-.cell-coord{font-size:.6rem;font-weight:700;color:var(--borda);}
-.cell-dica{font-size:.6rem;font-weight:700;color:var(--verde);word-break:break-word;margin-top:2px;line-height:1.2;}
-.cell-ok{font-size:1rem;color:var(--verde);}
+.cell-coord{font-size:.72rem;font-weight:800;color:var(--creme-dim);}
+.cell-dica{font-size:.65rem;font-weight:800;color:var(--verde);word-break:break-word;margin-top:3px;line-height:1.25;}
+.cell-ok{font-size:1.1rem;color:var(--verde);margin-bottom:2px;}
 
 /* ── OVERLAY RESULTADO ── */
 #overlay-result{
@@ -389,9 +428,9 @@ button:disabled{opacity:.35;cursor:default;transform:none;}
 <div id="links-screen">
   <div class="links-card">
     <h2>Links dos Jogadores</h2>
-    <p>Cada jogador abre o link no próprio celular. As cartas aparecem apenas para eles — sem spoilers.</p>
+    <p>Cada jogador escaneia o QR code ou abre o link no celular. As cartas são privadas — sem spoilers.</p>
     <div id="player-links"></div>
-    <button class="btn-ouro btn-full" style="margin-top:20px" onclick="startGame()">Iniciar Partida →</button>
+    <button class="btn-ouro btn-full" style="margin-top:24px" onclick="startGame()">Iniciar Partida →</button>
     <button class="btn-ghost btn-full" style="margin-top:10px" onclick="backToSetup()">← Voltar</button>
   </div>
 </div>
@@ -505,16 +544,38 @@ socket.on('roomCreated', ({ players }) => {
   roomPlayers = players;
   const el = document.getElementById('player-links');
   el.innerHTML = players.map((p, i) => `
-    <div class="player-link-item">
-      <div class="link-av av${i % 8}">${esc(p.name[0].toUpperCase())}</div>
-      <div class="link-info">
-        <div class="link-name">${esc(p.name)}</div>
-        <div class="link-url">${esc(p.url)}</div>
+    <div class="player-qr-card">
+      <div class="qr-header">
+        <div class="link-av av${i % 8}">${esc(p.name[0].toUpperCase())}</div>
+        <div class="qr-player-name">${esc(p.name)}</div>
+        <div class="connected-dot" id="dot-${i}"></div>
       </div>
-      <button class="btn-copy" onclick="copyLink('${esc(p.url)}',this)">Copiar</button>
-      <div class="connected-dot" id="dot-${i}"></div>
+      <div class="qr-box" id="qr-${i}"></div>
+      <div class="qr-url">${esc(p.url)}</div>
+      <button class="btn-copy" onclick="copyLink('${esc(p.url)}',this)">Copiar link</button>
     </div>
   `).join('');
+
+  // Gera QR codes após DOM estar pronto
+  if (typeof QRCode !== 'undefined') {
+    players.forEach((p, i) => {
+      new QRCode(document.getElementById('qr-' + i), {
+        text: p.url,
+        width: 148,
+        height: 148,
+        colorDark: '#1C1409',
+        colorLight: '#F5F0E8',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    });
+  } else {
+    // Fallback se a biblioteca não carregou
+    players.forEach((p, i) => {
+      const box = document.getElementById('qr-' + i);
+      if (box) box.innerHTML = '<div style="font-size:.7rem;color:var(--creme-dim);text-align:center;padding:8px">Use o link abaixo</div>';
+    });
+  }
+
   document.getElementById('setup').classList.add('hidden');
   document.getElementById('links-screen').classList.add('active');
 });
