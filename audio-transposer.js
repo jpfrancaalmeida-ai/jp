@@ -1,6 +1,7 @@
 import { SoundTouchNode } from './vendor/soundtouch/SoundTouchNode.js';
 
 const controllers = new Map();
+const pendingControllers = new Map();
 let audioContext = null;
 let registerPromise = null;
 
@@ -26,19 +27,25 @@ async function ensureRegistered(ctx){
 async function controllerFor(audio, id){
   const existing = controllers.get(id);
   if(existing?.audio === audio) return existing;
+  const pending = pendingControllers.get(id);
+  if(pending) return pending;
   if(existing) destroy(id);
-
-  const ctx = context();
-  await ensureRegistered(ctx);
-  const source = ctx.createMediaElementSource(audio);
-  const processor = new SoundTouchNode({context:ctx});
-  source.connect(processor);
-  processor.connect(ctx.destination);
-  audio.preservesPitch = false;
-  audio.addEventListener('play', ()=>ctx.resume(), {passive:true});
-  const controller = {audio, source, processor};
-  controllers.set(id, controller);
-  return controller;
+  const creating = (async()=>{
+    const ctx = context();
+    await ensureRegistered(ctx);
+    const source = ctx.createMediaElementSource(audio);
+    const processor = new SoundTouchNode({context:ctx});
+    source.connect(processor);
+    processor.connect(ctx.destination);
+    audio.preservesPitch = false;
+    audio.addEventListener('play', ()=>ctx.resume(), {passive:true});
+    const controller = {audio, source, processor};
+    controllers.set(id, controller);
+    return controller;
+  })();
+  pendingControllers.set(id,creating);
+  try{ return await creating; }
+  finally{ pendingControllers.delete(id); }
 }
 
 async function setPitch(audio, id, semitones){
@@ -50,6 +57,7 @@ async function setPitch(audio, id, semitones){
 }
 
 function destroy(id){
+  pendingControllers.delete(id);
   const controller = controllers.get(id);
   if(!controller) return;
   try{ controller.source.disconnect(); }catch(_error){}

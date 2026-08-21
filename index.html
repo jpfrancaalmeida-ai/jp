@@ -186,27 +186,45 @@
   .cifra-none{font-size:11.5px; color:var(--muted); font-style:italic;}
 
   /* ---------- VOZES ---------- */
+  .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;}
+  .voz-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;}
+  .voz-modal-title{min-width:0;}
+  .voz-modal-title h3{font-size:18px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .voz-filter{display:flex;align-items:center;gap:6px;margin-left:auto;}
+  .voz-filter label{font-size:11px;color:var(--muted);font-weight:600;}
+  .voz-filter .input{padding:7px 9px;max-width:148px;}
   .voz-type-badge{
     font-size:10px; text-transform:uppercase; letter-spacing:0.07em;
     border:1px solid var(--line); border-radius:20px; padding:2px 8px;
     color:var(--ink-soft); flex:none;
   }
   .voz-row{
-    display:flex; align-items:flex-start; gap:10px; padding:10px 0;
+    padding:12px 0;
     border-bottom:1px solid var(--line);
   }
   .voz-row:last-child{border-bottom:none;}
+  .voz-row-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
+  .voz-meta{display:flex;align-items:center;gap:7px;min-width:0;}
+  .voz-name{font-size:12px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .voz-name.is-empty{color:var(--muted);font-style:italic;}
+  .voz-actions{display:flex;gap:5px;flex:none;}
+  .voz-actions .icon-btn{width:28px;height:28px;}
   .voz-player{flex:1;min-width:0;}
   .voz-audio{width:100%; height:36px; min-width:0;display:block;}
   .voz-audio::-webkit-media-controls-panel{background:var(--paper);}
-  .transposer{display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap;}
+  .transposer{display:flex;align-items:center;gap:7px;margin-top:7px;}
   .transposer-label{font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
   .transposer-btn{width:28px;height:28px;border:1px solid var(--line-strong);border-radius:7px;background:var(--paper);color:var(--ink);font-size:17px;line-height:1;cursor:pointer;}
   .transposer-btn:hover{border-color:var(--ink);}
-  .transposer-range{flex:1;min-width:110px;accent-color:var(--ink);}
-  .transposer-value{font:600 11px 'JetBrains Mono',monospace;min-width:72px;text-align:center;color:var(--ink-soft);}
-  .transposer-reset{border:0;background:none;color:var(--muted);font-size:11px;text-decoration:underline;cursor:pointer;padding:3px;}
-  .transposer-status{width:100%;font-size:10.5px;color:var(--muted);min-height:13px;}
+  .transposer-range{flex:1;min-width:70px;accent-color:var(--ink);}
+  .transposer-state{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:82px;height:28px;padding:0 8px;border:1px solid var(--line-strong);border-radius:20px;background:var(--paper);font:600 10.5px 'JetBrains Mono',monospace;color:var(--ink-soft);cursor:pointer;white-space:nowrap;}
+  .transposer-state:hover{border-color:var(--ink);}
+  .transposer-state-dot{width:7px;height:7px;border-radius:50%;background:#2f7a4f;box-shadow:0 0 0 2px rgba(47,122,79,.12);flex:none;}
+  .transposer-state.is-shifted .transposer-state-dot{background:#b06d16;box-shadow:0 0 0 2px rgba(176,109,22,.14);}
+  .voz-edit-form{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:10px;margin-bottom:9px;}
+  .voz-edit-fields{display:grid;grid-template-columns:130px 1fr;gap:8px;}
+  .voz-edit-fields .input{width:100%;}
+  .voz-edit-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:8px;}
   .voz-empty{text-align:center; padding:24px 0; color:var(--muted); font-size:13px;}
   .voz-add-section{border-top:1px solid var(--line); margin-top:10px; padding-top:14px;}
   .voz-file-label{
@@ -383,6 +401,16 @@
     .agenda-card{ padding:12px; }
     .team-grid{ gap:6px; }
     .ouv-link-btn{ padding:10px 12px; font-size:13px; }
+    .voz-modal-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;}
+    .voz-modal-title{grid-column:1;grid-row:1;}
+    .voz-modal-head>.icon-btn{grid-column:2;grid-row:1;}
+    .voz-filter{grid-column:1/-1;grid-row:2;width:100%;margin:0;}
+    .voz-filter .input{flex:1;max-width:none;}
+    .voz-edit-fields{grid-template-columns:1fr;}
+    .transposer{gap:5px;}
+    .transposer-label{display:none;}
+    .transposer-btn{width:32px;height:32px;flex:none;}
+    .transposer-state{height:32px;min-width:78px;padding:0 7px;font-size:10px;}
   }
   @media (max-width: 360px){
     .brand h1{ font-size:15px; }
@@ -517,6 +545,8 @@ let state = {
   isAdmin: false,
   currentUser: null,
   catFilter: 'musica',
+  voiceFilter: 'Todos',
+  editingVoiceId: null,
 };
 
 const TAG_COLORS = ['#121110','#76716a','#b53b3b','#a8722f','#6b8f3f','#2f6f8f','#5a4fae','#a83f8f'];
@@ -1747,9 +1777,17 @@ const VOZ_TIPOS = ['Melodia','Tenor','Contralto','Soprano'];
 function openVozesModal(songId){
   const song = state.songs.find(s=>s.id===songId);
   if(!song) return;
+  state.voiceFilter = 'Todos';
+  state.editingVoiceId = null;
   openModal(`
-    <div class="modal-head">
-      <h3>Vozes — ${escapeHtml(song.title)}</h3>
+    <div class="voz-modal-head">
+      <div class="voz-modal-title"><h3>Vozes — ${escapeHtml(song.title)}</h3></div>
+      <div class="voz-filter">
+        <label for="voz_filter">Filtrar</label>
+        <select class="input" id="voz_filter" onchange="setVoiceFilter('${songId}',this.value)">
+          ${voiceFilterOptions(songId)}
+        </select>
+      </div>
       <button class="icon-btn" onclick="closeModal()" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
     <div id="vozListWrap"></div>
@@ -1791,6 +1829,20 @@ function openVozesModal(songId){
   hydrateVoices(songId);
 }
 
+function voiceFilterOptions(songId){
+  const voices = state.voices[songId]||[];
+  return ['Todos',...VOZ_TIPOS].map(type=>{
+    const count = type==='Todos' ? voices.length : voices.filter(voice=>voice.tipo===type).length;
+    return `<option value="${type}" ${state.voiceFilter===type?'selected':''}>${type} (${count})</option>`;
+  }).join('');
+}
+
+function setVoiceFilter(songId, type){
+  state.voiceFilter = ['Todos',...VOZ_TIPOS].includes(type) ? type : 'Todos';
+  state.editingVoiceId = null;
+  renderVozesList(songId);
+}
+
 function renderVozesList(songId){
   const wrap = document.getElementById('vozListWrap');
   if(!wrap) return;
@@ -1800,12 +1852,28 @@ function renderVozesList(songId){
     wrap.innerHTML = `<p class="voz-empty">Nenhuma voz adicionada ainda.</p>`;
     return;
   }
-  wrap.innerHTML = `<div style="margin-bottom:6px;">${vozes.map((v,i)=>`
+  const filteredVoices = state.voiceFilter==='Todos' ? vozes : vozes.filter(voice=>voice.tipo===state.voiceFilter);
+  if(filteredVoices.length === 0){
+    wrap.innerHTML = `<p class="voz-empty">Nenhum áudio de ${escapeHtml(state.voiceFilter.toLowerCase())} nesta música.</p>`;
+    return;
+  }
+  wrap.innerHTML = `<div style="margin-bottom:6px;">${filteredVoices.map(v=>`
     <div class="voz-row">
-      <div style="display:flex;flex-direction:column;gap:2px;flex:none;">
-        <span class="voz-type-badge">${escapeHtml(v.tipo)}</span>
-        ${v.nome ? `<span style="font-size:10.5px;color:var(--muted);text-align:center;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(v.nome)}">${escapeHtml(v.nome)}</span>` : ''}
+      <div class="voz-row-head">
+        <div class="voz-meta">
+          <span class="voz-type-badge">${escapeHtml(v.tipo||'Voz')}</span>
+          <span class="voz-name ${v.nome?'':'is-empty'}" title="${escapeHtml(v.nome||'Sem identificação')}">${escapeHtml(v.nome||'Sem identificação')}</span>
+        </div>
+        ${state.isAdmin ? `<div class="voz-actions">
+          <button class="icon-btn" onclick="startEditVoice('${songId}','${v.id}')" aria-label="Editar ${escapeHtml(v.nome||v.tipo||'voz')}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
+          <button class="icon-btn" onclick="deleteVoz('${songId}','${v.id}')" aria-label="Remover ${escapeHtml(v.nome||v.tipo||'voz')}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+          </button>
+        </div>` : ''}
       </div>
+      ${state.editingVoiceId===v.id ? renderVoiceEditForm(songId,v) : ''}
       ${v.url||v.dataUrl||v.objectUrl
         ? `<div class="voz-player">
             <audio id="voz_audio_${v.id}" data-transposer-id="${v.id}" class="voz-audio" controls preload="metadata" src="${escapeHtml(v.url||v.dataUrl||v.objectUrl)}"></audio>
@@ -1814,16 +1882,109 @@ function renderVozesList(songId){
               <button class="transposer-btn" onclick="adjustVoicePitch('${songId}','${v.id}',-1)" aria-label="Diminuir um semitom">−</button>
               <input id="voz_pitch_${v.id}" class="transposer-range" type="range" min="-6" max="6" step="1" value="${Number(v.pitchSemitones)||0}" oninput="setVoicePitch('${songId}','${v.id}',this.value)" aria-label="Transposição em semitons">
               <button class="transposer-btn" onclick="adjustVoicePitch('${songId}','${v.id}',1)" aria-label="Aumentar um semitom">+</button>
-              <span id="voz_pitch_value_${v.id}" class="transposer-value">${pitchLabel(Number(v.pitchSemitones)||0)}</span>
-              <button class="transposer-reset" onclick="setVoicePitch('${songId}','${v.id}',0)">Original</button>
-              <span id="voz_pitch_status_${v.id}" class="transposer-status"></span>
+              <button id="voz_pitch_value_${v.id}" class="transposer-state ${(Number(v.pitchSemitones)||0)===0?'is-original':'is-shifted'}" onclick="setVoicePitch('${songId}','${v.id}',0)" title="Voltar ao tom original" aria-label="${(Number(v.pitchSemitones)||0)===0?'Tom original':'Voltar ao tom original'}">
+                <span class="transposer-state-dot"></span><span class="transposer-state-text">${pitchLabel(Number(v.pitchSemitones)||0)}</span>
+              </button>
+              <span id="voz_pitch_status_${v.id}" class="sr-only" aria-live="polite"></span>
             </div>
           </div>`
         : `<span class="hint" style="flex:1;">${v.loadError?'Falha ao carregar o áudio.':'Carregando áudio…'}</span>`}
-      ${state.isAdmin ? `<button class="icon-btn" onclick="deleteVoz('${songId}','${v.id}')" aria-label="Remover">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
-      </button>` : ''}
     </div>`).join('')}</div>`;
+}
+
+function renderVoiceEditForm(songId, voice){
+  return `<div class="voz-edit-form">
+    <div class="voz-edit-fields">
+      <select class="input" id="voz_edit_tipo_${voice.id}" aria-label="Tipo de voz">
+        ${VOZ_TIPOS.map(type=>`<option value="${type}" ${voice.tipo===type?'selected':''}>${type}</option>`).join('')}
+      </select>
+      <input class="input" id="voz_edit_nome_${voice.id}" value="${escapeHtml(voice.nome||'')}" maxlength="100" placeholder="Nome / identificação" aria-label="Nome ou identificação">
+    </div>
+    <div class="voz-edit-actions">
+      <button class="btn btn-sm btn-ghost" onclick="cancelEditVoice('${songId}')">Cancelar</button>
+      <button class="btn btn-sm btn-dark" id="voz_edit_save_${voice.id}" onclick="saveVoiceEdit('${songId}','${voice.id}')">Salvar</button>
+    </div>
+  </div>`;
+}
+
+function startEditVoice(songId, voiceId){
+  state.editingVoiceId = voiceId;
+  renderVozesList(songId);
+  document.getElementById(`voz_edit_nome_${voiceId}`)?.focus();
+}
+
+function cancelEditVoice(songId){
+  state.editingVoiceId = null;
+  renderVozesList(songId);
+}
+
+function legacyVoicesForStore(updatedVoice, excludedVoiceId=null){
+  const snapshot = {};
+  Object.entries(state.voices).forEach(([songId,voices])=>{
+    const legacyVoices = voices.filter(voice=>!voice.documentBacked&&voice.id!==excludedVoiceId).map(voice=>{
+      const source = voice.id===updatedVoice?.id ? {...voice,...updatedVoice} : voice;
+      const {objectUrl,loadError,pitchSemitones,documentBacked,...stored} = source;
+      return stored;
+    });
+    if(legacyVoices.length) snapshot[songId] = legacyVoices;
+  });
+  return snapshot;
+}
+
+async function migrateLegacyVoice(songId, voice, tipo, nome){
+  const dataUrl = voice.dataUrl||'';
+  if(!dataUrl.startsWith('data:audio')) return null;
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  const extension = blob.type.includes('mpeg') ? 'mp3' : blob.type.includes('wav') ? 'wav' : blob.type.includes('ogg') ? 'ogg' : 'webm';
+  const file = new File([blob],voice.fileName||`${safeFileName(nome||tipo||'voz')}.${extension}`,{type:blob.type||'audio/webm'});
+  let migrated = null;
+  try{
+    migrated = await uploadAsset('songVoices','voices',songId,file,{tipo,nome});
+    await saveKey('voices__v1',legacyVoicesForStore(null,voice.id));
+    return migrated;
+  }catch(error){
+    if(migrated){
+      await deleteAssetChunks('songVoices',migrated.id).catch(()=>{});
+      await db.collection('songVoices').doc(migrated.id).delete().catch(()=>{});
+    }
+    throw error;
+  }
+}
+
+async function saveVoiceEdit(songId, voiceId){
+  if(!auth.currentUser){ showToast('Entre no modo líder para editar.'); return; }
+  const voice = (state.voices[songId]||[]).find(item=>item.id===voiceId);
+  if(!voice) return;
+  const tipo = document.getElementById(`voz_edit_tipo_${voiceId}`)?.value;
+  const nome = (document.getElementById(`voz_edit_nome_${voiceId}`)?.value||'').trim().slice(0,100);
+  const saveButton = document.getElementById(`voz_edit_save_${voiceId}`);
+  if(saveButton){ saveButton.disabled=true; saveButton.textContent='Salvando…'; }
+  try{
+    let savedVoice = {...voice,tipo,nome};
+    if(voice.documentBacked){
+      const ref = db.collection('songVoices').doc(voiceId);
+      await ref.set({tipo,nome,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:auth.currentUser.uid},{merge:true});
+      const confirmed = await ref.get({source:'server'});
+      if(!confirmed.exists||confirmed.data().tipo!==tipo||confirmed.data().nome!==nome) throw new Error('O servidor não confirmou a edição.');
+      savedVoice = {...voice,...confirmed.data(),id:confirmed.id,documentBacked:true};
+    }else{
+      const migrated = await migrateLegacyVoice(songId,voice,tipo,nome);
+      if(migrated) savedVoice = {...migrated,pitchSemitones:voice.pitchSemitones||0};
+      else await saveKey('voices__v1',legacyVoicesForStore({id:voiceId,tipo,nome}));
+    }
+    state.voices[songId] = (state.voices[songId]||[]).map(item=>item.id===voiceId?savedVoice:item);
+    state.editingVoiceId = null;
+    const filter = document.getElementById('voz_filter');
+    if(filter) filter.innerHTML = voiceFilterOptions(songId);
+    renderVozesList(songId);
+    renderCatalog();
+    showToast('Voz atualizada.');
+  }catch(error){
+    console.error('saveVoiceEdit',error);
+    showToast(error.message||'Não foi possível editar a voz.');
+    if(saveButton){ saveButton.disabled=false; saveButton.textContent='Salvar'; }
+  }
 }
 
 function pitchLabel(semitones){
@@ -1847,7 +2008,12 @@ async function setVoicePitch(songId, voiceId, semitones){
   const value = Math.max(-6,Math.min(6,Number(semitones)||0));
   voice.pitchSemitones = value;
   input.value = value;
-  if(valueEl) valueEl.textContent = pitchLabel(value);
+  if(valueEl){
+    valueEl.querySelector('.transposer-state-text').textContent = pitchLabel(value);
+    valueEl.classList.toggle('is-original',value===0);
+    valueEl.classList.toggle('is-shifted',value!==0);
+    valueEl.setAttribute('aria-label',value===0?'Tom original':'Voltar ao tom original');
+  }
   if(statusEl) statusEl.textContent = 'Aplicando…';
   try{
     if(!window.PibuTransposer) throw new Error('O transpositor ainda está carregando. Tente novamente.');

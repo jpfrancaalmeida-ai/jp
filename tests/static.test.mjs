@@ -69,3 +69,28 @@ test('transpositor usa AudioWorklet local e não muda a velocidade do elemento',
   assert.match(soundTouchNode, /class SoundTouchNode extends AudioWorkletNode/);
   assert.match(soundTouchProcessor, /registerProcessor/);
 });
+
+test('UX de vozes oferece filtro por classificação e indicador compacto de tom', () => {
+  assert.match(index, /id="voz_filter"/);
+  assert.match(index, /\['Todos',\.\.\.VOZ_TIPOS\]/);
+  assert.match(index, /class="transposer-state/);
+  assert.match(index, /class="transposer-state-dot"/);
+  assert.match(index, /class="sr-only" aria-live="polite"/);
+  assert.doesNotMatch(index, /class="transposer-reset"/);
+  assert.doesNotMatch(index, /class="transposer-status"/);
+});
+
+test('líder pode editar nome e tipo com confirmação do servidor', () => {
+  assert.match(index, /function startEditVoice/);
+  assert.match(index, /function saveVoiceEdit/);
+  assert.match(index, /\{merge:true\}/);
+  assert.match(index, /ref\.get\(\{source:'server'\}\)/);
+  assert.match(index, /confirmed\.data\(\)\.tipo!==tipo/);
+});
+
+test('primeira edição de áudio legado migra para documentos fragmentados', () => {
+  assert.match(index, /function migrateLegacyVoice/);
+  assert.match(index, /uploadAsset\('songVoices','voices'/);
+  assert.match(index, /legacyVoicesForStore\(null,voice\.id\)/);
+  assert.match(index, /deleteAssetChunks\('songVoices',migrated\.id\)/);
+});
