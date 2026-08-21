@@ -253,6 +253,10 @@
     border-bottom:1px solid var(--line);
   }
   .apoio-row:last-child{border-bottom:none;}
+  .apoio-upload-note{display:flex;align-items:flex-start;gap:8px;margin:4px 0 12px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--paper);font-size:11.5px;line-height:1.45;color:var(--ink-soft);}
+  .apoio-upload-note svg{width:15px;height:15px;flex:none;margin-top:1px;color:var(--muted);}
+  .apoio-upload-note strong{color:var(--ink);}
+  .apoio-link-hint{font-size:11px;color:var(--muted);margin:5px 0 0;}
   .apoio-type-badge{
     font-size:10px; text-transform:uppercase; letter-spacing:0.07em;
     border:1px solid var(--line); border-radius:20px; padding:2px 8px;
@@ -539,6 +543,7 @@ let state = {
   agenda: [],
   tagDefs: [],
   voices: {},
+  voiceMeta: {},
   apoio: {},
   knownNames: [],
   knownRoles: [],
@@ -938,9 +943,26 @@ async function uploadAsset(collectionName, folder, songId, file, extra){
   const chunks = splitString(base64, FIRESTORE_CHUNK_CHARS);
   const parent = db.collection(collectionName).doc(id);
   const operations = chunks.map((data,index)=>batch=>batch.set(parent.collection('chunks').doc(String(index).padStart(4,'0')), {index,data}));
+  const metadata = {songId, encoding:'base64-chunks', chunkCount:chunks.length, fileName:safeFileName(file.name), contentType:file.type||'application/octet-stream', size:file.size, ...extra};
+  if(collectionName==='songMaterials'){
+    let parentCreated = false;
+    try{
+      await saveAssetDocument(collectionName,id,{...metadata,uploadComplete:false});
+      parentCreated = true;
+      await commitInGroups(operations);
+      await parent.update({uploadComplete:true,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:auth.currentUser.uid});
+      const confirmed = await parent.get({source:'server'});
+      if(!confirmed.exists||confirmed.data().uploadComplete!==true) throw new Error('O servidor não confirmou o arquivo completo.');
+      return {id:confirmed.id,...confirmed.data(),documentBacked:true};
+    }catch(e){
+      await deleteAssetChunks(collectionName,id).catch(()=>{});
+      if(parentCreated) await parent.delete().catch(()=>{});
+      throw e;
+    }
+  }
   try{
     await commitInGroups(operations);
-    return await saveAssetDocument(collectionName, id, {songId, encoding:'base64-chunks', chunkCount:chunks.length, fileName:safeFileName(file.name), contentType:file.type||'application/octet-stream', size:file.size, ...extra});
+    return await saveAssetDocument(collectionName,id,metadata);
   }catch(e){
     await deleteAssetChunks(collectionName,id).catch(()=>{});
     throw e;
@@ -976,7 +998,7 @@ async function loadAssetCollection(collectionName, target){
     const snapshot = await db.collection(collectionName).get();
     snapshot.forEach(doc=>{
       const item = {id:doc.id, ...doc.data(), documentBacked:true};
-      if(!item.songId) return;
+      if(!item.songId||item.uploadComplete===false) return;
       if(!target[item.songId]) target[item.songId] = [];
       if(!target[item.songId].some(existing=>existing.id===item.id)) target[item.songId].push(item);
     });
@@ -1614,7 +1636,9 @@ function openOuvirModal(songId){
 }
 
 /* ================= APOIO ================= */
-const APOIO_TIPOS = ['Áudio','PDF','Texto','Outro'];
+const APOIO_TIPOS = ['Áudio','PDF','Texto','Vídeo','Outro'];
+const VIDEO_FILE_PATTERN = /\.(mp4|m4v|mov|avi|mkv|webm|wmv|flv)(\?.*)?$/i;
+const AUDIO_FILE_PATTERN = /\.(mp3|m4a|wav|ogg|opus|aac|weba)(\?.*)?$/i;
 
 function openApoioModal(songId){
   const song = state.songs.find(s=>s.id===songId);
@@ -1640,17 +1664,12 @@ function openApoioModal(songId){
           <input class="input" id="apoio_nome" placeholder="Ex: Violão — arranjo da equipe" style="width:100%;">
         </div>
       </div>
-      <div id="apoio_inputWrap">
-        <div class="field">
-          <label>Arquivo (áudio ou PDF)</label>
-          <label class="voz-file-label" for="apoio_fileInput">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-            <span id="apoio_fileLabel">Selecionar arquivo…</span>
-          </label>
-          <input type="file" id="apoio_fileInput" accept="audio/*,application/pdf" onchange="apoioFileSelected(this)">
-        </div>
+      <div class="apoio-upload-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+        <span>Envie <strong>áudio ou PDF</strong> (até 10 MB), escreva um texto ou adicione um link. <strong>Não é possível enviar vídeos como arquivo;</strong> para vídeos, cole o link.</span>
       </div>
-      <p class="error-msg" id="apoioError" style="display:none;">Adicione um arquivo ou texto.</p>
+      <div id="apoio_inputWrap">${apoioInputHtml('Áudio')}</div>
+      <p class="error-msg" id="apoioError" style="display:none;"></p>
       <div class="modal-actions" style="margin-top:10px;">
         <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
         <button class="btn btn-dark" onclick="addApoio('${songId}')">
@@ -1666,27 +1685,68 @@ function openApoioModal(songId){
   renderApoioList(songId);
 }
 
+function apoioInputHtml(tipo){
+  if(tipo === 'Texto'){
+    return `<div class="field"><label>Texto</label><textarea class="input" id="apoio_texto" rows="4" maxlength="20000" placeholder="Cole ou escreva o texto de apoio aqui…" style="width:100%;"></textarea></div>`;
+  }
+  if(tipo === 'Vídeo' || tipo === 'Outro'){
+    const placeholder = tipo==='Vídeo' ? 'https://youtube.com/…' : 'https://…';
+    return `<div class="field">
+      <label for="apoio_url">Link ${tipo==='Vídeo'?'do vídeo':'do material'}</label>
+      <input class="input" id="apoio_url" type="url" inputmode="url" maxlength="2000" placeholder="${placeholder}" style="width:100%;">
+      <p class="apoio-link-hint">Somente links iniciados por http:// ou https://.</p>
+    </div>`;
+  }
+  const accept = tipo==='PDF' ? 'application/pdf,.pdf' : 'audio/*,.mp3,.m4a,.wav,.ogg,.opus,.aac';
+  return `<div class="field">
+    <label>Arquivo ${tipo==='PDF'?'PDF':'de áudio'}</label>
+    <label class="voz-file-label" for="apoio_fileInput">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      <span id="apoio_fileLabel">Selecionar ${tipo==='PDF'?'PDF':'áudio'}…</span>
+    </label>
+    <input type="file" id="apoio_fileInput" accept="${accept}" onchange="apoioFileSelected(this)">
+  </div>`;
+}
+
 function apoioTipoChanged(){
   const tipo = document.getElementById('apoio_tipo').value;
   const wrap = document.getElementById('apoio_inputWrap');
-  if(tipo === 'Texto'){
-    wrap.innerHTML = `<div class="field"><label>Texto</label><textarea class="input" id="apoio_texto" rows="4" placeholder="Cole ou escreva o texto de apoio aqui…" style="width:100%;"></textarea></div>`;
-  } else {
-    const accept = tipo === 'PDF' ? 'application/pdf' : tipo === 'Áudio' ? 'audio/*' : '*/*';
-    wrap.innerHTML = `<div class="field">
-      <label>Arquivo</label>
-      <label class="voz-file-label" for="apoio_fileInput">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-        <span id="apoio_fileLabel">Selecionar arquivo…</span>
-      </label>
-      <input type="file" id="apoio_fileInput" accept="${accept}" onchange="apoioFileSelected(this)">
-    </div>`;
-  }
+  wrap.innerHTML = apoioInputHtml(tipo);
+  const error = document.getElementById('apoioError');
+  if(error) error.style.display='none';
+}
+
+function validateApoioFile(tipo,file){
+  if(!file) throw new Error('Selecione um arquivo.');
+  if(tipo!=='Áudio'&&tipo!=='PDF') throw new Error('Vídeo e Outro aceitam somente link, nunca arquivo.');
+  if(file.type.startsWith('video/')||VIDEO_FILE_PATTERN.test(file.name)) throw new Error('Não é possível enviar vídeos. Cole um link para o vídeo.');
+  if(tipo==='Áudio'&&!file.type.startsWith('audio/')&&!AUDIO_FILE_PATTERN.test(file.name)) throw new Error('Selecione um arquivo de áudio válido.');
+  if(tipo==='PDF'&&file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name)) throw new Error('Selecione um arquivo PDF válido.');
+  if(file.size>MAX_UPLOAD_BYTES) throw new Error('O arquivo ultrapassa o limite gratuito de 10 MB.');
+}
+
+function normalizedApoioUrl(value){
+  const raw=(value||'').trim();
+  let parsed;
+  try{ parsed=new URL(raw); }catch(_error){ throw new Error('Cole um link válido, começando com http:// ou https://.'); }
+  if(!['http:','https:'].includes(parsed.protocol)) throw new Error('O link deve começar com http:// ou https://.');
+  if(parsed.href.length>2000) throw new Error('O link é muito longo. Use uma URL com até 2.000 caracteres.');
+  return parsed.href;
 }
 
 function apoioFileSelected(input){
   const label = document.getElementById('apoio_fileLabel');
-  if(label && input.files && input.files[0]) label.textContent = input.files[0].name;
+  const error = document.getElementById('apoioError');
+  try{
+    const file=input.files?.[0];
+    validateApoioFile(document.getElementById('apoio_tipo').value,file);
+    if(label) label.textContent=file.name;
+    if(error) error.style.display='none';
+  }catch(e){
+    input.value='';
+    if(label) label.textContent='Selecionar arquivo…';
+    if(error){ error.textContent=e.message; error.style.display='block'; }
+  }
 }
 
 function renderApoioList(songId){
@@ -1713,8 +1773,8 @@ function renderApoioList(songId){
             ? item.tipo==='Áudio' || (item.dataUrl||'').startsWith('data:audio')
               ? `<audio controls src="${escapeHtml(item.url||item.dataUrl)}" style="width:100%;height:36px;margin-top:4px;"></audio>`
               : `<a href="${escapeHtml(item.url||item.dataUrl)}" target="_blank" rel="noopener" class="cifra-link" style="display:inline-flex;margin-top:4px;">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                  Baixar arquivo
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/></svg>
+                  ${item.tipo==='Vídeo'?'Abrir vídeo':'Abrir link'}
                 </a>`
             : ''}
       </div>
@@ -1734,15 +1794,21 @@ async function addApoio(songId){
   try{
     if(tipo === 'Texto'){
       const texto = (document.getElementById('apoio_texto')?.value||'').trim();
-      if(!texto){ errEl.style.display='block'; return; }
+      if(!texto) throw new Error('Escreva ou cole o texto de apoio.');
       const id = uid();
       item = await saveAssetDocument('songMaterials', id, {songId, tipo, nome, texto});
+    } else if(tipo==='Vídeo'||tipo==='Outro'){
+      const url=normalizedApoioUrl(document.getElementById('apoio_url')?.value);
+      const id=uid();
+      item=await saveAssetDocument('songMaterials',id,{songId,tipo,nome,url});
     } else {
       const fileInput = document.getElementById('apoio_fileInput');
-      if(!fileInput?.files?.[0]){ errEl.style.display='block'; return; }
-      item = await uploadAsset('songMaterials', 'materials', songId, fileInput.files[0], {tipo, nome});
+      const file=fileInput?.files?.[0];
+      validateApoioFile(tipo,file);
+      const contentType=tipo==='PDF'?'application/pdf':file.type||'audio/mpeg';
+      item = await uploadAsset('songMaterials','materials',songId,file,{tipo,nome,contentType});
     }
-  }catch(e){ console.error('addApoio', e); showToast(e.message||'Não foi possível salvar o material.'); return; }
+  }catch(e){ console.error('addApoio', e); errEl.textContent=e.message||'Não foi possível salvar o material.'; errEl.style.display='block'; return; }
   if(!state.apoio[songId]) state.apoio[songId] = [];
   state.apoio[songId].push(item);
   renderApoioList(songId);
@@ -1752,6 +1818,10 @@ async function addApoio(songId){
   if(fileInput) fileInput.value='';
   const lbl = document.getElementById('apoio_fileLabel');
   if(lbl) lbl.textContent='Selecionar arquivo…';
+  const urlInput=document.getElementById('apoio_url');
+  if(urlInput) urlInput.value='';
+  const textInput=document.getElementById('apoio_texto');
+  if(textInput) textInput.value='';
   showToast('Material adicionado.');
 }
 
@@ -1904,6 +1974,7 @@ function renderVoiceEditForm(songId, voice){
       <button class="btn btn-sm btn-ghost" onclick="cancelEditVoice('${songId}')">Cancelar</button>
       <button class="btn btn-sm btn-dark" id="voz_edit_save_${voice.id}" onclick="saveVoiceEdit('${songId}','${voice.id}')">Salvar</button>
     </div>
+    <p class="error-msg" id="voz_edit_error_${voice.id}" style="display:none;margin:8px 0 0;"></p>
   </div>`;
 }
 
@@ -1931,27 +2002,6 @@ function legacyVoicesForStore(updatedVoice, excludedVoiceId=null){
   return snapshot;
 }
 
-async function migrateLegacyVoice(songId, voice, tipo, nome){
-  const dataUrl = voice.dataUrl||'';
-  if(!dataUrl.startsWith('data:audio')) return null;
-  const response = await fetch(dataUrl);
-  const blob = await response.blob();
-  const extension = blob.type.includes('mpeg') ? 'mp3' : blob.type.includes('wav') ? 'wav' : blob.type.includes('ogg') ? 'ogg' : 'webm';
-  const file = new File([blob],voice.fileName||`${safeFileName(nome||tipo||'voz')}.${extension}`,{type:blob.type||'audio/webm'});
-  let migrated = null;
-  try{
-    migrated = await uploadAsset('songVoices','voices',songId,file,{tipo,nome});
-    await saveKey('voices__v1',legacyVoicesForStore(null,voice.id));
-    return migrated;
-  }catch(error){
-    if(migrated){
-      await deleteAssetChunks('songVoices',migrated.id).catch(()=>{});
-      await db.collection('songVoices').doc(migrated.id).delete().catch(()=>{});
-    }
-    throw error;
-  }
-}
-
 async function saveVoiceEdit(songId, voiceId){
   if(!auth.currentUser){ showToast('Entre no modo líder para editar.'); return; }
   const voice = (state.voices[songId]||[]).find(item=>item.id===voiceId);
@@ -1959,19 +2009,22 @@ async function saveVoiceEdit(songId, voiceId){
   const tipo = document.getElementById(`voz_edit_tipo_${voiceId}`)?.value;
   const nome = (document.getElementById(`voz_edit_nome_${voiceId}`)?.value||'').trim().slice(0,100);
   const saveButton = document.getElementById(`voz_edit_save_${voiceId}`);
+  const errorEl = document.getElementById(`voz_edit_error_${voiceId}`);
+  if(errorEl) errorEl.style.display='none';
   if(saveButton){ saveButton.disabled=true; saveButton.textContent='Salvando…'; }
   try{
+    await auth.currentUser.getIdToken(true);
     let savedVoice = {...voice,tipo,nome};
     if(voice.documentBacked){
       const ref = db.collection('songVoices').doc(voiceId);
-      await ref.set({tipo,nome,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:auth.currentUser.uid},{merge:true});
+      await ref.update({tipo,nome,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:auth.currentUser.uid});
       const confirmed = await ref.get({source:'server'});
       if(!confirmed.exists||confirmed.data().tipo!==tipo||confirmed.data().nome!==nome) throw new Error('O servidor não confirmou a edição.');
       savedVoice = {...voice,...confirmed.data(),id:confirmed.id,documentBacked:true};
     }else{
-      const migrated = await migrateLegacyVoice(songId,voice,tipo,nome);
-      if(migrated) savedVoice = {...migrated,pitchSemitones:voice.pitchSemitones||0};
-      else await saveKey('voices__v1',legacyVoicesForStore({id:voiceId,tipo,nome}));
+      const nextMeta={...state.voiceMeta,[voiceId]:{tipo,nome}};
+      await saveKey('voiceMeta__v1',nextMeta);
+      state.voiceMeta=nextMeta;
     }
     state.voices[songId] = (state.voices[songId]||[]).map(item=>item.id===voiceId?savedVoice:item);
     state.editingVoiceId = null;
@@ -1982,7 +2035,11 @@ async function saveVoiceEdit(songId, voiceId){
     showToast('Voz atualizada.');
   }catch(error){
     console.error('saveVoiceEdit',error);
-    showToast(error.message||'Não foi possível editar a voz.');
+    const message = error?.code==='permission-denied'
+      ? 'Sua sessão não tem permissão para editar. Saia do modo líder, entre novamente e tente de novo.'
+      : error?.message||'Não foi possível editar a voz.';
+    if(errorEl){ errorEl.textContent=message; errorEl.style.display='block'; }
+    showToast('Não foi possível editar a voz.');
     if(saveButton){ saveButton.disabled=false; saveButton.textContent='Salvar'; }
   }
 }
@@ -2074,8 +2131,10 @@ async function deleteVoz(songId, voiceId){
     await deleteAssetChunks('songVoices',voiceId);
     await db.collection('songVoices').doc(voiceId).delete();
   } else {
-    const next = {...state.voices, [songId]:(state.voices[songId]||[]).filter(v=>v.id!==voiceId)};
-    await saveKey('voices__v1', next);
+    const nextMeta={...state.voiceMeta};
+    delete nextMeta[voiceId];
+    await saveKeys([['voices__v1',legacyVoicesForStore(null,voiceId)],['voiceMeta__v1',nextMeta]]);
+    state.voiceMeta=nextMeta;
   }
   state.voices[songId] = (state.voices[songId]||[]).filter(v=>v.id!==voiceId);
   renderVozesList(songId);
@@ -2102,11 +2161,15 @@ async function init(){
   state.agenda = await loadKey('agenda__v1', []);
   state.tagDefs = await loadKey('tagDefs__v1', []);
   state.voices = await loadKey('voices__v1', {});
+  state.voiceMeta = await loadKey('voiceMeta__v1', {});
   state.apoio = await loadKey('apoio__v1', {});
   await Promise.all([
     loadAssetCollection('songVoices', state.voices),
     loadAssetCollection('songMaterials', state.apoio)
   ]);
+  Object.values(state.voices).flat().forEach(voice=>{
+    if(!voice.documentBacked&&state.voiceMeta[voice.id]) Object.assign(voice,state.voiceMeta[voice.id]);
+  });
   const teamKnown = await loadKey('teamKnown__v1', {names:[],roles:[]});
   state.knownNames = teamKnown.names||[];
   state.knownRoles = teamKnown.roles||[];

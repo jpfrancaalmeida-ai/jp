@@ -8,6 +8,7 @@ const legacyEntry = await readFile(new URL('../louvor.html', import.meta.url), '
 const transposer = await readFile(new URL('../audio-transposer.js', import.meta.url), 'utf8');
 const soundTouchNode = await readFile(new URL('../vendor/soundtouch/SoundTouchNode.js', import.meta.url), 'utf8');
 const soundTouchProcessor = await readFile(new URL('../vendor/soundtouch/soundtouch-processor.js', import.meta.url), 'utf8');
+const firestoreRules = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8');
 
 function inlineScripts(html) {
   return [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
@@ -83,14 +84,33 @@ test('UX de vozes oferece filtro por classificação e indicador compacto de tom
 test('líder pode editar nome e tipo com confirmação do servidor', () => {
   assert.match(index, /function startEditVoice/);
   assert.match(index, /function saveVoiceEdit/);
-  assert.match(index, /\{merge:true\}/);
+  assert.match(index, /getIdToken\(true\)/);
+  assert.match(index, /ref\.update\(\{tipo,nome/);
   assert.match(index, /ref\.get\(\{source:'server'\}\)/);
   assert.match(index, /confirmed\.data\(\)\.tipo!==tipo/);
+  assert.match(firestoreRules, /affectedKeys\(\)\.hasOnly\(\['tipo', 'nome', 'updatedAt', 'updatedBy'\]\)/);
 });
 
-test('primeira edição de áudio legado migra para documentos fragmentados', () => {
-  assert.match(index, /function migrateLegacyVoice/);
-  assert.match(index, /uploadAsset\('songVoices','voices'/);
-  assert.match(index, /legacyVoicesForStore\(null,voice\.id\)/);
-  assert.match(index, /deleteAssetChunks\('songVoices',migrated\.id\)/);
+test('edição de áudio legado salva apenas metadados pequenos', () => {
+  assert.match(index, /voiceMeta: \{\}/);
+  assert.match(index, /saveKey\('voiceMeta__v1',nextMeta\)/);
+  assert.match(index, /loadKey\('voiceMeta__v1', \{\}\)/);
+  assert.match(index, /Object\.assign\(voice,state\.voiceMeta\[voice\.id\]\)/);
+  assert.doesNotMatch(index, /function migrateLegacyVoice/);
+});
+
+test('Apoio separa uploads seguros de materiais que aceitam somente link', () => {
+  assert.match(index, /\['Áudio','PDF','Texto','Vídeo','Outro'\]/);
+  assert.match(index, /tipo === 'Vídeo' \|\| tipo === 'Outro'/);
+  assert.match(index, /type="url" inputmode="url"/);
+  assert.match(index, /Não é possível enviar vídeos/);
+  assert.match(index, /file\.type\.startsWith\('video\/'\)/);
+  assert.doesNotMatch(index, /accept="\*\/\*"/);
+});
+
+test('regras permitem arquivo somente para Áudio ou PDF e exigem link para Vídeo ou Outro', () => {
+  assert.match(firestoreRules, /request\.resource\.data\.tipo == 'Áudio' \|\| request\.resource\.data\.tipo == 'PDF'/);
+  assert.match(firestoreRules, /request\.resource\.data\.tipo == 'Vídeo' \|\| request\.resource\.data\.tipo == 'Outro'/);
+  assert.match(firestoreRules, /request\.resource\.data\.url is string/);
+  assert.match(firestoreRules, /get\(\/databases\/\$\(database\)\/documents\/songMaterials\/\$\(materialId\)\)\.data\.tipo/);
 });

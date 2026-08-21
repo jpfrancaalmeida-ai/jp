@@ -17,7 +17,7 @@ service cloud.firestore {
 
     match /songVoices/{voiceId} {
       allow read: if true;
-      allow create, update: if signedIn()
+      allow create: if signedIn()
         && request.resource.data.songId is string
         && request.resource.data.encoding == 'base64-chunks'
         && request.resource.data.chunkCount is int
@@ -25,6 +25,13 @@ service cloud.firestore {
         && request.resource.data.chunkCount <= 24
         && request.resource.data.size is int
         && request.resource.data.size <= 10485760
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tipo', 'nome', 'updatedAt', 'updatedBy'])
+        && request.resource.data.tipo is string
+        && request.resource.data.tipo.size() <= 30
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() <= 100
         && request.resource.data.updatedBy == request.auth.uid;
       allow delete: if signedIn();
 
@@ -43,19 +50,37 @@ service cloud.firestore {
       allow create, update: if signedIn()
         && request.resource.data.songId is string
         && request.resource.data.tipo is string
-        && (!request.resource.data.keys().hasAny(['encoding'])
-          || (request.resource.data.encoding == 'base64-chunks'
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() <= 100
+        && (
+          ((request.resource.data.tipo == 'Áudio' || request.resource.data.tipo == 'PDF')
+            && request.resource.data.encoding == 'base64-chunks'
             && request.resource.data.chunkCount is int
             && request.resource.data.chunkCount > 0
             && request.resource.data.chunkCount <= 24
             && request.resource.data.size is int
-          && request.resource.data.size <= 10485760))
+            && request.resource.data.size <= 10485760
+            && request.resource.data.contentType is string
+            && ((request.resource.data.tipo == 'Áudio' && request.resource.data.contentType.matches('audio/.*'))
+              || (request.resource.data.tipo == 'PDF' && request.resource.data.contentType == 'application/pdf')))
+          || (request.resource.data.tipo == 'Texto'
+            && !request.resource.data.keys().hasAny(['encoding'])
+            && request.resource.data.texto is string
+            && request.resource.data.texto.size() <= 20000)
+          || ((request.resource.data.tipo == 'Vídeo' || request.resource.data.tipo == 'Outro')
+            && !request.resource.data.keys().hasAny(['encoding'])
+            && request.resource.data.url is string
+            && request.resource.data.url.size() <= 2000)
+        )
         && request.resource.data.updatedBy == request.auth.uid;
       allow delete: if signedIn();
 
       match /chunks/{chunkId} {
         allow read: if true;
         allow create, update: if signedIn()
+          && (get(/databases/$(database)/documents/songMaterials/$(materialId)).data.tipo == 'Áudio'
+            || get(/databases/$(database)/documents/songMaterials/$(materialId)).data.tipo == 'PDF')
+          && get(/databases/$(database)/documents/songMaterials/$(materialId)).data.encoding == 'base64-chunks'
           && request.resource.data.index is int
           && request.resource.data.data is string
           && request.resource.data.data.size() <= 600000;

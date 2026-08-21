@@ -20,8 +20,15 @@ O modo Líder usa Firebase Authentication com e-mail e senha. As regras versiona
 
 - Cada gravação da área Vozes pode ser transposta de -6 a +6 semitons em tempo real, sem alterar a velocidade e sem gravar uma nova cópia no Firebase.
 - A lista pode ser filtrada por Melodia, Tenor, Contralto ou Soprano.
-- Líderes podem editar o nome e o tipo de uma gravação. Na primeira edição, gravações legadas em Base64 são migradas com segurança para o formato fragmentado atual.
+- Líderes podem editar o nome e o tipo de uma gravação. Nos áudios legados, a edição é guardada em um pequeno documento de metadados para não regravar o arquivo Base64 próximo do limite do Firestore.
 - O processamento usa a Web Audio API no aparelho do visitante. A implementação inclui localmente o SoundTouchJS 2.1.1 sob a licença MPL-2.0, preservada em `vendor/soundtouch/LICENSE`.
+
+## Materiais de apoio
+
+- Áudio e PDF aceitam arquivos de até 10 MB.
+- Texto é salvo diretamente no Firestore.
+- Vídeo e Outro aceitam somente links HTTP/HTTPS; a interface e as regras não permitem documentos fragmentados desses tipos.
+- O arquivo é validado por tipo e extensão antes do envio. O documento do material é criado antes dos blocos para que as regras confirmem que somente Áudio ou PDF podem possuir chunks.
 
 ## Validação local
 
