@@ -1,0 +1,70 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    match /store/{key} {
+      allow read: if true;
+      allow create, update: if signedIn()
+        && request.resource.data.value is string
+        && request.resource.data.value.size() < 900000
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if signedIn();
+    }
+
+    match /songVoices/{voiceId} {
+      allow read: if true;
+      allow create, update: if signedIn()
+        && request.resource.data.songId is string
+        && request.resource.data.encoding == 'base64-chunks'
+        && request.resource.data.chunkCount is int
+        && request.resource.data.chunkCount > 0
+        && request.resource.data.chunkCount <= 24
+        && request.resource.data.size is int
+        && request.resource.data.size <= 10485760
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if signedIn();
+
+      match /chunks/{chunkId} {
+        allow read: if true;
+        allow create, update: if signedIn()
+          && request.resource.data.index is int
+          && request.resource.data.data is string
+          && request.resource.data.data.size() <= 600000;
+        allow delete: if signedIn();
+      }
+    }
+
+    match /songMaterials/{materialId} {
+      allow read: if true;
+      allow create, update: if signedIn()
+        && request.resource.data.songId is string
+        && request.resource.data.tipo is string
+        && (!request.resource.data.keys().hasAny(['encoding'])
+          || (request.resource.data.encoding == 'base64-chunks'
+            && request.resource.data.chunkCount is int
+            && request.resource.data.chunkCount > 0
+            && request.resource.data.chunkCount <= 24
+            && request.resource.data.size is int
+          && request.resource.data.size <= 10485760))
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if signedIn();
+
+      match /chunks/{chunkId} {
+        allow read: if true;
+        allow create, update: if signedIn()
+          && request.resource.data.index is int
+          && request.resource.data.data is string
+          && request.resource.data.data.size() <= 600000;
+        allow delete: if signedIn();
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

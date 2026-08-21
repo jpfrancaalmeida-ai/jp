@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script>
   const firebaseConfig = {
@@ -19,6 +20,7 @@
     appId: "1:1043025889799:web:080417385d5ffbb8c2f8a2"
   };
   firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
   const db = firebase.firestore();
 </script>
 <style>
@@ -466,14 +468,14 @@
       <p style="font-size:13.5px;color:var(--muted);margin:0 0 22px;">Entre com seu acesso de liderança para editar o catálogo, o mural e a agenda.</p>
       <div style="max-width:280px;margin:0 auto;text-align:left;">
         <div class="field">
-          <label>Usuário</label>
-          <input class="input" id="loginUser" placeholder="usuário">
+          <label for="loginEmail">E-mail</label>
+          <input class="input" id="loginEmail" type="email" autocomplete="username" placeholder="lider@igreja.org">
         </div>
         <div class="field">
-          <label>Senha</label>
-          <input class="input" id="loginPass" type="password" placeholder="senha">
+          <label for="loginPass">Senha</label>
+          <input class="input" id="loginPass" type="password" autocomplete="current-password" placeholder="senha">
         </div>
-        <p class="error-msg" id="loginError" style="display:none;">Usuário ou senha incorretos.</p>
+        <p class="error-msg" id="loginError" style="display:none;">Não foi possível entrar. Confira o e-mail e a senha.</p>
         <button class="btn btn-dark" style="width:100%;justify-content:center;margin-top:8px;" onclick="doLogin()">Entrar</button>
       </div>
     </div>
@@ -503,6 +505,7 @@ let state = {
   knownNames: [],
   knownRoles: [],
   isAdmin: false,
+  currentUser: null,
   catFilter: 'musica',
 };
 
@@ -611,10 +614,25 @@ async function loadKey(key, fallback){
   }catch(e){ console.warn('loadKey', key, e); return fallback; }
 }
 async function saveKey(key, value){
+  return saveKeys([[key,value]]);
+}
+async function saveKeys(entries){
   try{
-    await db.collection('store').doc(key).set({ value: JSON.stringify(value) });
+    if(!auth.currentUser) throw new Error('Autenticação necessária para salvar.');
+    const prepared = entries.map(([key,value])=>({key, serialized:JSON.stringify(value), ref:db.collection('store').doc(key)}));
+    const batch = db.batch();
+    prepared.forEach(item=>batch.set(item.ref, {value:item.serialized, updatedAt:firebase.firestore.FieldValue.serverTimestamp(), updatedBy:auth.currentUser.uid}));
+    await batch.commit();
+    const confirmations = await Promise.all(prepared.map(item=>item.ref.get({source:'server'})));
+    if(confirmations.some((doc,i)=>!doc.exists || doc.data().value !== prepared[i].serialized)){
+      throw new Error('O servidor não confirmou todo o conteúdo salvo.');
+    }
     return true;
-  }catch(e){ showToast('Não foi possível salvar agora. Tente de novo.'); return null; }
+  }catch(e){
+    console.error('saveKeys', entries.map(([key])=>key), e);
+    showToast('Não foi possível salvar. Nada foi confirmado pelo servidor.');
+    throw e;
+  }
 }
 
 function showToast(msg){
@@ -640,11 +658,17 @@ function fmtTime(t){
   const [h,m] = t.split(':');
   return `${h}h${m && m!=='00' ? m : ''}`;
 }
+function localISODate(date=new Date()){
+  const year = date.getFullYear();
+  const month = String(date.getMonth()+1).padStart(2,'0');
+  const day = String(date.getDate()).padStart(2,'0');
+  return `${year}-${month}-${day}`;
+}
 function nextSundayISO(){
   const d = new Date();
   const diff = (7 - d.getDay()) % 7;
   d.setDate(d.getDate() + (diff===0?0:diff));
-  return d.toISOString().slice(0,10);
+  return localISODate(d);
 }
 function initials(name){
   return (name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]?.toUpperCase()||'').join('');
@@ -679,7 +703,7 @@ function renderAdminUI(){
   if(state.isAdmin){
     pillWrap.innerHTML = `<div class="admin-pill on">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M20 6L9 17l-5-5"/></svg>
-      Modo líder <button onclick="doLogout()">saír</button>
+      Modo líder <button onclick="doLogout()">sair</button>
     </div>`;
     bannerWrap.innerHTML = `<div class="admin-banner">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
@@ -794,27 +818,133 @@ function renderImportBar(){
 async function importDriveBatch(silent=false){
   const pending = pendingImportBatch();
   if(pending.length === 0) return;
-  pending.forEach(s => state.songs.push({id:uid(), title:s.title, artist:s.artist||'', tom:s.tom||'', tags:[], chordLink:s.chordLink||'', category:s.category||'musica'}));
-  await saveKey('songs__v1', state.songs);
+  const nextSongs = state.songs.concat(pending.map(s=>({id:uid(), title:s.title, artist:s.artist||'', tom:s.tom||'', tags:[], chordLink:s.chordLink||'', category:s.category||'musica'})));
+  await saveKey('songs__v1', nextSongs);
+  state.songs = nextSongs;
   renderCatalog();
   renderImportBar();
   if(!silent) showToast(`${pending.length} item(ns) importado(s) com sucesso.`);
 }
 
-function doLogin(){
-  const u = document.getElementById('loginUser').value.trim();
+async function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
   const p = document.getElementById('loginPass').value.trim();
-  if(u === 'lider' && p === '1234'){
+  const error = document.getElementById('loginError');
+  error.style.display='none';
+  try{
+    const credential = await auth.signInWithEmailAndPassword(email, p);
+    state.currentUser = credential.user;
     state.isAdmin = true;
-    document.getElementById('loginError').style.display='none';
     renderAdminUI(); renderCatalog(); renderMural(); renderAgenda();
     showToast('Bem-vindo(a) ao modo líder.');
     switchTab('catalogo');
-  } else {
-    document.getElementById('loginError').style.display='block';
+  } catch(e) {
+    console.warn('login', e.code || e.message);
+    error.style.display='block';
   }
 }
-function doLogout(){
+
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const FIRESTORE_CHUNK_CHARS = 600000;
+
+function safeFileName(name){
+  return (name||'arquivo').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'-').slice(0,100);
+}
+
+async function saveAssetDocument(collectionName, id, data){
+  if(!auth.currentUser) throw new Error('Autenticação necessária para salvar.');
+  const ref = db.collection(collectionName).doc(id);
+  await ref.set({...data, updatedAt:firebase.firestore.FieldValue.serverTimestamp(), updatedBy:auth.currentUser.uid});
+  const confirmed = await ref.get({source:'server'});
+  if(!confirmed.exists) throw new Error('O servidor não confirmou o arquivo salvo.');
+  return {id:confirmed.id, ...confirmed.data(), documentBacked:true};
+}
+
+async function fileToBase64(file){
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+  for(let offset=0; offset<bytes.length; offset+=32768){
+    binary += String.fromCharCode(...bytes.subarray(offset, offset+32768));
+  }
+  return btoa(binary);
+}
+
+function splitString(value, size){
+  const parts = [];
+  for(let offset=0; offset<value.length; offset+=size) parts.push(value.slice(offset,offset+size));
+  return parts;
+}
+
+async function commitInGroups(operations, groupSize=10){
+  for(let start=0; start<operations.length; start+=groupSize){
+    const batch = db.batch();
+    operations.slice(start,start+groupSize).forEach(operation=>operation(batch));
+    await batch.commit();
+  }
+}
+
+async function deleteAssetChunks(collectionName, id){
+  const snapshot = await db.collection(collectionName).doc(id).collection('chunks').get();
+  const operations = [];
+  snapshot.forEach(doc=>operations.push(batch=>batch.delete(doc.ref)));
+  await commitInGroups(operations);
+}
+
+async function uploadAsset(collectionName, folder, songId, file, extra){
+  if(!file) throw new Error('Selecione um arquivo.');
+  if(file.size > MAX_UPLOAD_BYTES) throw new Error('O arquivo ultrapassa o limite gratuito de 10 MB.');
+  const id = uid();
+  const base64 = await fileToBase64(file);
+  const chunks = splitString(base64, FIRESTORE_CHUNK_CHARS);
+  const parent = db.collection(collectionName).doc(id);
+  const operations = chunks.map((data,index)=>batch=>batch.set(parent.collection('chunks').doc(String(index).padStart(4,'0')), {index,data}));
+  try{
+    await commitInGroups(operations);
+    return await saveAssetDocument(collectionName, id, {songId, encoding:'base64-chunks', chunkCount:chunks.length, fileName:safeFileName(file.name), contentType:file.type||'application/octet-stream', size:file.size, ...extra});
+  }catch(e){
+    await deleteAssetChunks(collectionName,id).catch(()=>{});
+    throw e;
+  }
+}
+
+async function assetObjectUrl(collectionName, item){
+  if(item.objectUrl) return item.objectUrl;
+  const snapshot = await db.collection(collectionName).doc(item.id).collection('chunks').orderBy('index').get();
+  const parts = [];
+  snapshot.forEach(doc=>parts.push(doc.data().data));
+  if(parts.length !== item.chunkCount) throw new Error('O arquivo está incompleto no servidor.');
+  const binary = atob(parts.join(''));
+  const bytes = new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
+  item.objectUrl = URL.createObjectURL(new Blob([bytes],{type:item.contentType||'application/octet-stream'}));
+  return item.objectUrl;
+}
+
+async function downloadChunkedAsset(collectionName, itemId, songId){
+  const source = collectionName==='songVoices' ? state.voices : state.apoio;
+  const item = (source[songId]||[]).find(entry=>entry.id===itemId);
+  if(!item) return;
+  try{
+    const url = await assetObjectUrl(collectionName,item);
+    const link = document.createElement('a');
+    link.href=url; link.download=item.fileName||'arquivo'; link.click();
+  }catch(e){ console.error('downloadChunkedAsset',e); showToast('Não foi possível carregar o arquivo.'); }
+}
+
+async function loadAssetCollection(collectionName, target){
+  try{
+    const snapshot = await db.collection(collectionName).get();
+    snapshot.forEach(doc=>{
+      const item = {id:doc.id, ...doc.data(), documentBacked:true};
+      if(!item.songId) return;
+      if(!target[item.songId]) target[item.songId] = [];
+      if(!target[item.songId].some(existing=>existing.id===item.id)) target[item.songId].push(item);
+    });
+  }catch(e){ console.warn('loadAssetCollection', collectionName, e); }
+}
+async function doLogout(){
+  await auth.signOut();
+  state.currentUser = null;
   state.isAdmin = false;
   renderAdminUI(); renderCatalog(); renderMural(); renderAgenda();
   showToast('Você saiu do modo líder.');
@@ -1018,13 +1148,11 @@ async function saveSong(id){
   const chordLink = document.getElementById('f_link').value.trim();
   const streamLinks = window._streamLinksDraft || [];
 
-  if(id){
-    const s = state.songs.find(s=>s.id===id);
-    Object.assign(s, {title, artist, tom, tags, chordLink, category, streamLinks});
-  } else {
-    state.songs.push({id:uid(), title, artist, tom, tags, chordLink, category, streamLinks});
-  }
-  await saveKey('songs__v1', state.songs);
+  const nextSongs = id
+    ? state.songs.map(s=>s.id===id ? {...s,title,artist,tom,tags,chordLink,category,streamLinks} : s)
+    : state.songs.concat({id:uid(),title,artist,tom,tags,chordLink,category,streamLinks});
+  await saveKey('songs__v1', nextSongs);
+  state.songs = nextSongs;
   closeModal();
   state.catFilter = category;
   document.querySelectorAll('.cat-toggle-btn').forEach(b=>b.classList.toggle('active', b.dataset.cat===category));
@@ -1083,25 +1211,28 @@ async function addTagDef(){
   const input = document.getElementById('newTagName');
   const name = input.value.trim();
   if(!name) return;
-  state.tagDefs.push({id:uid(), name, color: window._newTagColor || TAG_COLORS[0]});
-  await saveKey('tagDefs__v1', state.tagDefs);
+  const nextTags = state.tagDefs.concat({id:uid(), name, color:window._newTagColor||TAG_COLORS[0]});
+  await saveKey('tagDefs__v1', nextTags);
+  state.tagDefs = nextTags;
   input.value = '';
   renderTagManagerList();
 }
 async function deleteTagDef(id){
   if(!confirm('Remover esta tag? Ela será retirada de todas as músicas que a usam.')) return;
-  state.tagDefs = state.tagDefs.filter(t=>t.id!==id);
-  state.songs.forEach(s=>{ if(s.tags) s.tags = s.tags.filter(tid=>tid!==id); });
-  await saveKey('tagDefs__v1', state.tagDefs);
-  await saveKey('songs__v1', state.songs);
+  const nextTags = state.tagDefs.filter(t=>t.id!==id);
+  const nextSongs = state.songs.map(s=>({...s,tags:(s.tags||[]).filter(tid=>tid!==id)}));
+  await saveKeys([['tagDefs__v1',nextTags],['songs__v1',nextSongs]]);
+  state.tagDefs = nextTags;
+  state.songs = nextSongs;
   renderTagManagerList();
   renderCatalog();
 }
 
 async function deleteSong(id){
   if(!confirm('Remover esta música do catálogo?')) return;
-  state.songs = state.songs.filter(s=>s.id!==id);
-  await saveKey('songs__v1', state.songs);
+  const nextSongs = state.songs.filter(s=>s.id!==id);
+  await saveKey('songs__v1', nextSongs);
+  state.songs = nextSongs;
   renderCatalog();
   showToast('Música removida.');
 }
@@ -1139,7 +1270,7 @@ function muralSetlistHtml(m, isPast){
 
 function renderMural(){
   const wrap = document.getElementById('muralWrap');
-  const today = new Date().toISOString().slice(0,10);
+  const today = localISODate();
   const current = state.murals.filter(m=>m.date >= today).sort((a,b)=>a.date.localeCompare(b.date));
   const past = state.murals.filter(m=>m.date < today).sort((a,b)=>b.date.localeCompare(a.date));
 
@@ -1183,7 +1314,7 @@ function openMuralModal(){
     `);
     return;
   }
-  const today = new Date().toISOString().slice(0,10);
+  const today = localISODate();
   const existing = state.murals.filter(m=>m.date>=today).sort((a,b)=>a.date.localeCompare(b.date))[0];
   const date = existing?.date || nextSundayISO();
   const items = existing?.items ? [...existing.items].sort((a,b)=>a.order-b.order) : [];
@@ -1252,16 +1383,18 @@ function muralRemove(i){
 async function saveMural(){
   const date = document.getElementById('m_date').value;
   const items = window._muralDraft.map((it,i)=>({...it,order:i}));
+  const nextMurals = state.murals.map(m=>({...m,items:[...(m.items||[])]}));
   if(window._muralEditId){
-    const m = state.murals.find(m=>m.id===window._muralEditId);
+    const m = nextMurals.find(m=>m.id===window._muralEditId);
     if(m){ m.date=date; m.items=items; }
-    else  { state.murals.push({id:uid(),date,items}); }
+    else  { nextMurals.push({id:uid(),date,items}); }
   } else {
-    const existing = state.murals.find(m=>m.date===date);
+    const existing = nextMurals.find(m=>m.date===date);
     if(existing){ existing.items=items; }
-    else         { state.murals.push({id:uid(),date,items}); }
+    else         { nextMurals.push({id:uid(),date,items}); }
   }
-  await saveKey('murals__v1', state.murals);
+  await saveKey('murals__v1', nextMurals);
+  state.murals = nextMurals;
   closeModal();
   renderMural();
   showToast('Mural salvo.');
@@ -1270,7 +1403,7 @@ async function saveMural(){
 /* ================= AGENDA ================= */
 function renderAgenda(){
   const wrap = document.getElementById('agendaWrap');
-  const today = new Date().toISOString().slice(0,10);
+  const today = localISODate();
   const events = state.agenda.filter(e=>e.date >= today).sort((a,b)=>a.date.localeCompare(b.date));
   const past = state.agenda.filter(e=>e.date < today).sort((a,b)=>b.date.localeCompare(a.date));
 
@@ -1368,7 +1501,7 @@ function renderTeamDraft(){
       <button class="icon-btn" onclick="teamRemove(${i})" aria-label="Remover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>`).join('')}</div>`;
 }
-async function teamAdd(){
+function teamAdd(){
   const name = document.getElementById('t_name').value.trim();
   const role = document.getElementById('t_role').value.trim();
   if(!name) return;
@@ -1376,10 +1509,8 @@ async function teamAdd(){
   document.getElementById('t_name').value='';
   document.getElementById('t_role').value='';
   renderTeamDraft();
-  let changed = false;
-  if(!state.knownNames.includes(name)){ state.knownNames.push(name); changed=true; }
-  if(role && !state.knownRoles.includes(role)){ state.knownRoles.push(role); changed=true; }
-  if(changed) await saveKey('teamKnown__v1', {names:state.knownNames, roles:state.knownRoles});
+  if(!state.knownNames.includes(name)) state.knownNames.push(name);
+  if(role && !state.knownRoles.includes(role)) state.knownRoles.push(role);
 }
 function teamRemove(i){ window._teamDraft.splice(i,1); renderTeamDraft(); }
 
@@ -1389,21 +1520,21 @@ async function saveEvent(id){
   const time = document.getElementById('e_time').value.trim();
   const desc = document.getElementById('e_desc').value.trim();
   const team = window._teamDraft;
-  if(id){
-    const e = state.agenda.find(e=>e.id===id);
-    Object.assign(e, {date, time, desc, team});
-  } else {
-    state.agenda.push({id:uid(), date, time, desc, team});
-  }
-  await saveKey('agenda__v1', state.agenda);
+  const nextAgenda = id
+    ? state.agenda.map(e=>e.id===id ? {...e,date,time,desc,team} : e)
+    : state.agenda.concat({id:uid(),date,time,desc,team});
+  const teamKnown = {names:state.knownNames,roles:state.knownRoles};
+  await saveKeys([['agenda__v1',nextAgenda],['teamKnown__v1',teamKnown]]);
+  state.agenda = nextAgenda;
   closeModal();
   renderAgenda();
   showToast('Agenda atualizada.');
 }
 async function deleteEvent(id){
   if(!confirm('Remover esta data da agenda?')) return;
-  state.agenda = state.agenda.filter(e=>e.id!==id);
-  await saveKey('agenda__v1', state.agenda);
+  const nextAgenda = state.agenda.filter(e=>e.id!==id);
+  await saveKey('agenda__v1', nextAgenda);
+  state.agenda = nextAgenda;
   renderAgenda();
   showToast('Data removida.');
 }
@@ -1532,10 +1663,15 @@ function renderApoioList(songId){
         <p class="apoio-nome">${escapeHtml(item.nome||item.tipo)}</p>
         ${item.tipo==='Texto'
           ? `<div class="apoio-texto-body">${escapeHtml(item.texto||'')}</div>`
-          : item.dataUrl
-            ? item.tipo==='Áudio' || item.dataUrl.startsWith('data:audio')
-              ? `<audio controls src="${item.dataUrl}" style="width:100%;height:36px;margin-top:4px;"></audio>`
-              : `<a href="${item.dataUrl}" download="${escapeHtml(item.nome||'arquivo')}" class="cifra-link" style="display:inline-flex;margin-top:4px;">
+          : item.encoding==='base64-chunks'
+            ? `<button class="cifra-link" onclick="downloadChunkedAsset('songMaterials','${item.id}','${songId}')" style="display:inline-flex;margin-top:4px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                Baixar arquivo
+              </button>`
+          : (item.url||item.dataUrl)
+            ? item.tipo==='Áudio' || (item.dataUrl||'').startsWith('data:audio')
+              ? `<audio controls src="${escapeHtml(item.url||item.dataUrl)}" style="width:100%;height:36px;margin-top:4px;"></audio>`
+              : `<a href="${escapeHtml(item.url||item.dataUrl)}" target="_blank" rel="noopener" class="cifra-link" style="display:inline-flex;margin-top:4px;">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                   Baixar arquivo
                 </a>`
@@ -1553,26 +1689,21 @@ async function addApoio(songId){
   const errEl = document.getElementById('apoioError');
   errEl.style.display='none';
 
-  let item = {id:uid(), tipo, nome};
-
-  if(tipo === 'Texto'){
-    const texto = (document.getElementById('apoio_texto')?.value||'').trim();
-    if(!texto){ errEl.style.display='block'; return; }
-    item.texto = texto;
-  } else {
-    const fileInput = document.getElementById('apoio_fileInput');
-    if(!fileInput?.files?.[0]){ errEl.style.display='block'; return; }
-    item.dataUrl = await new Promise((resolve,reject)=>{
-      const r = new FileReader();
-      r.onload = e => resolve(e.target.result);
-      r.onerror = reject;
-      r.readAsDataURL(fileInput.files[0]);
-    });
-  }
-
+  let item;
+  try{
+    if(tipo === 'Texto'){
+      const texto = (document.getElementById('apoio_texto')?.value||'').trim();
+      if(!texto){ errEl.style.display='block'; return; }
+      const id = uid();
+      item = await saveAssetDocument('songMaterials', id, {songId, tipo, nome, texto});
+    } else {
+      const fileInput = document.getElementById('apoio_fileInput');
+      if(!fileInput?.files?.[0]){ errEl.style.display='block'; return; }
+      item = await uploadAsset('songMaterials', 'materials', songId, fileInput.files[0], {tipo, nome});
+    }
+  }catch(e){ console.error('addApoio', e); showToast(e.message||'Não foi possível salvar o material.'); return; }
   if(!state.apoio[songId]) state.apoio[songId] = [];
   state.apoio[songId].push(item);
-  await saveKey('apoio__v1', state.apoio);
   renderApoioList(songId);
   renderCatalog();
   document.getElementById('apoio_nome').value='';
@@ -1585,8 +1716,15 @@ async function addApoio(songId){
 
 async function deleteApoio(songId, itemId){
   if(!confirm('Remover este material de apoio?')) return;
+  const item = (state.apoio[songId]||[]).find(i=>i.id===itemId);
+  if(item?.documentBacked){
+    await deleteAssetChunks('songMaterials',itemId);
+    await db.collection('songMaterials').doc(itemId).delete();
+  } else {
+    const next = {...state.apoio, [songId]:(state.apoio[songId]||[]).filter(i=>i.id!==itemId)};
+    await saveKey('apoio__v1', next);
+  }
   state.apoio[songId] = (state.apoio[songId]||[]).filter(i=>i.id!==itemId);
-  await saveKey('apoio__v1', state.apoio);
   renderApoioList(songId);
   renderCatalog();
   showToast('Material removido.');
@@ -1639,6 +1777,7 @@ function openVozesModal(songId){
     </div>`}
   `);
   renderVozesList(songId);
+  hydrateVoices(songId);
 }
 
 function renderVozesList(songId){
@@ -1655,11 +1794,22 @@ function renderVozesList(songId){
         <span class="voz-type-badge">${escapeHtml(v.tipo)}</span>
         ${v.nome ? `<span style="font-size:10.5px;color:var(--muted);text-align:center;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(v.nome)}">${escapeHtml(v.nome)}</span>` : ''}
       </div>
-      <audio class="voz-audio" controls src="${v.dataUrl}"></audio>
+      ${v.url||v.dataUrl||v.objectUrl
+        ? `<audio class="voz-audio" controls src="${escapeHtml(v.url||v.dataUrl||v.objectUrl)}"></audio>`
+        : `<span class="hint" style="flex:1;">${v.loadError?'Falha ao carregar o áudio.':'Carregando áudio…'}</span>`}
       ${state.isAdmin ? `<button class="icon-btn" onclick="deleteVoz('${songId}','${v.id}')" aria-label="Remover">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
       </button>` : ''}
     </div>`).join('')}</div>`;
+}
+
+async function hydrateVoices(songId){
+  const voices = state.voices[songId]||[];
+  await Promise.all(voices.filter(v=>v.encoding==='base64-chunks'&&!v.objectUrl).map(async v=>{
+    try{ await assetObjectUrl('songVoices',v); }
+    catch(e){ v.loadError=true; console.error('hydrateVoice',v.id,e); }
+  }));
+  if(document.getElementById('vozListWrap')) renderVozesList(songId);
 }
 
 function vozFileSelected(input){
@@ -1680,17 +1830,13 @@ async function addVoz(songId){
     return;
   }
   errEl.style.display = 'none';
-  const file = fileInput.files[0];
   const nome = (document.getElementById('voz_nome').value||'').trim();
-  const dataUrl = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => resolve(e.target.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+  let voice;
+  try{
+    voice = await uploadAsset('songVoices', 'voices', songId, fileInput.files[0], {tipo, nome});
+  }catch(e){ console.error('addVoz', e); showToast(e.message||'Não foi possível salvar a voz.'); return; }
   if(!state.voices[songId]) state.voices[songId] = [];
-  state.voices[songId].push({id: uid(), tipo, nome, dataUrl});
-  await saveKey('voices__v1', state.voices);
+  state.voices[songId].push(voice);
   renderVozesList(songId);
   renderCatalog();
   fileInput.value = '';
@@ -1701,8 +1847,15 @@ async function addVoz(songId){
 
 async function deleteVoz(songId, voiceId){
   if(!confirm('Remover esta gravação de voz?')) return;
+  const voice = (state.voices[songId]||[]).find(v=>v.id===voiceId);
+  if(voice?.documentBacked){
+    await deleteAssetChunks('songVoices',voiceId);
+    await db.collection('songVoices').doc(voiceId).delete();
+  } else {
+    const next = {...state.voices, [songId]:(state.voices[songId]||[]).filter(v=>v.id!==voiceId)};
+    await saveKey('voices__v1', next);
+  }
   state.voices[songId] = (state.voices[songId]||[]).filter(v=>v.id!==voiceId);
-  await saveKey('voices__v1', state.voices);
   renderVozesList(songId);
   renderCatalog();
   showToast('Voz removida.');
@@ -1712,21 +1865,29 @@ async function deleteVoz(songId, voiceId){
 async function init(){
   renderTabs();
   switchTab('catalogo');
+  await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+  state.currentUser = await new Promise(resolve=>{
+    const unsubscribe = auth.onAuthStateChanged(user=>{ unsubscribe(); resolve(user); }, ()=>resolve(null));
+  });
+  state.isAdmin = !!state.currentUser;
   state.songs = await loadKey('songs__v1', []);
   // migração: se existir mural antigo (objeto único), converte para array
   const oldMural = await loadKey('mural__v1', null);
   const newMurals = await loadKey('murals__v1', null);
   if(newMurals){ state.murals = newMurals; }
-  else if(oldMural && oldMural.date){ state.murals = [{id:uid(), date:oldMural.date, items:oldMural.items||[]}]; await saveKey('murals__v1', state.murals); }
+  else if(oldMural && oldMural.date){ state.murals = [{id:uid(), date:oldMural.date, items:oldMural.items||[]}]; }
   else { state.murals = []; }
   state.agenda = await loadKey('agenda__v1', []);
   state.tagDefs = await loadKey('tagDefs__v1', []);
   state.voices = await loadKey('voices__v1', {});
   state.apoio = await loadKey('apoio__v1', {});
+  await Promise.all([
+    loadAssetCollection('songVoices', state.voices),
+    loadAssetCollection('songMaterials', state.apoio)
+  ]);
   const teamKnown = await loadKey('teamKnown__v1', {names:[],roles:[]});
   state.knownNames = teamKnown.names||[];
   state.knownRoles = teamKnown.roles||[];
-  await importDriveBatch(true);
   renderAdminUI();
   renderCatalog();
   renderMural();

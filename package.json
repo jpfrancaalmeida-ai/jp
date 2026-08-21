@@ -1,0 +1,12 @@
+{
+  "name": "louvor-pibu",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "backup": "node scripts/backup-firestore.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
