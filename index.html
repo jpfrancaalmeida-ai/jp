@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script type="module" src="./audio-transposer.js"></script>
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyCINdLifPvAaPvbl3qLLV-bCPL2_Vpd0do",
@@ -191,12 +192,21 @@
     color:var(--ink-soft); flex:none;
   }
   .voz-row{
-    display:flex; align-items:center; gap:10px; padding:10px 0;
+    display:flex; align-items:flex-start; gap:10px; padding:10px 0;
     border-bottom:1px solid var(--line);
   }
   .voz-row:last-child{border-bottom:none;}
-  .voz-audio{flex:1; height:36px; min-width:0;}
+  .voz-player{flex:1;min-width:0;}
+  .voz-audio{width:100%; height:36px; min-width:0;display:block;}
   .voz-audio::-webkit-media-controls-panel{background:var(--paper);}
+  .transposer{display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap;}
+  .transposer-label{font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+  .transposer-btn{width:28px;height:28px;border:1px solid var(--line-strong);border-radius:7px;background:var(--paper);color:var(--ink);font-size:17px;line-height:1;cursor:pointer;}
+  .transposer-btn:hover{border-color:var(--ink);}
+  .transposer-range{flex:1;min-width:110px;accent-color:var(--ink);}
+  .transposer-value{font:600 11px 'JetBrains Mono',monospace;min-width:72px;text-align:center;color:var(--ink-soft);}
+  .transposer-reset{border:0;background:none;color:var(--muted);font-size:11px;text-decoration:underline;cursor:pointer;padding:3px;}
+  .transposer-status{width:100%;font-size:10.5px;color:var(--muted);min-height:13px;}
   .voz-empty{text-align:center; padding:24px 0; color:var(--muted); font-size:13px;}
   .voz-add-section{border-top:1px solid var(--line); margin-top:10px; padding-top:14px;}
   .voz-file-label{
@@ -956,6 +966,7 @@ function openModal(html){
   document.getElementById('overlay').classList.add('show');
 }
 function closeModal(){
+  window.PibuTransposer?.disposeWithin(document.getElementById('modalContent'));
   document.getElementById('overlay').classList.remove('show');
 }
 document.getElementById('overlay').addEventListener('click', e=>{
@@ -1783,6 +1794,7 @@ function openVozesModal(songId){
 function renderVozesList(songId){
   const wrap = document.getElementById('vozListWrap');
   if(!wrap) return;
+  window.PibuTransposer?.disposeWithin(wrap);
   const vozes = state.voices[songId] || [];
   if(vozes.length === 0){
     wrap.innerHTML = `<p class="voz-empty">Nenhuma voz adicionada ainda.</p>`;
@@ -1795,12 +1807,56 @@ function renderVozesList(songId){
         ${v.nome ? `<span style="font-size:10.5px;color:var(--muted);text-align:center;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(v.nome)}">${escapeHtml(v.nome)}</span>` : ''}
       </div>
       ${v.url||v.dataUrl||v.objectUrl
-        ? `<audio class="voz-audio" controls src="${escapeHtml(v.url||v.dataUrl||v.objectUrl)}"></audio>`
+        ? `<div class="voz-player">
+            <audio id="voz_audio_${v.id}" data-transposer-id="${v.id}" class="voz-audio" controls preload="metadata" src="${escapeHtml(v.url||v.dataUrl||v.objectUrl)}"></audio>
+            <div class="transposer" aria-label="Transpositor de tom">
+              <span class="transposer-label">Tom</span>
+              <button class="transposer-btn" onclick="adjustVoicePitch('${songId}','${v.id}',-1)" aria-label="Diminuir um semitom">−</button>
+              <input id="voz_pitch_${v.id}" class="transposer-range" type="range" min="-6" max="6" step="1" value="${Number(v.pitchSemitones)||0}" oninput="setVoicePitch('${songId}','${v.id}',this.value)" aria-label="Transposição em semitons">
+              <button class="transposer-btn" onclick="adjustVoicePitch('${songId}','${v.id}',1)" aria-label="Aumentar um semitom">+</button>
+              <span id="voz_pitch_value_${v.id}" class="transposer-value">${pitchLabel(Number(v.pitchSemitones)||0)}</span>
+              <button class="transposer-reset" onclick="setVoicePitch('${songId}','${v.id}',0)">Original</button>
+              <span id="voz_pitch_status_${v.id}" class="transposer-status"></span>
+            </div>
+          </div>`
         : `<span class="hint" style="flex:1;">${v.loadError?'Falha ao carregar o áudio.':'Carregando áudio…'}</span>`}
       ${state.isAdmin ? `<button class="icon-btn" onclick="deleteVoz('${songId}','${v.id}')" aria-label="Remover">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
       </button>` : ''}
     </div>`).join('')}</div>`;
+}
+
+function pitchLabel(semitones){
+  const value = Number(semitones)||0;
+  return value===0 ? 'Original' : `${value>0?'+':''}${value} semitom${Math.abs(value)===1?'':'s'}`;
+}
+
+function adjustVoicePitch(songId, voiceId, delta){
+  const input = document.getElementById(`voz_pitch_${voiceId}`);
+  if(!input) return;
+  setVoicePitch(songId,voiceId,Number(input.value)+delta);
+}
+
+async function setVoicePitch(songId, voiceId, semitones){
+  const voice = (state.voices[songId]||[]).find(item=>item.id===voiceId);
+  const audio = document.getElementById(`voz_audio_${voiceId}`);
+  const input = document.getElementById(`voz_pitch_${voiceId}`);
+  const valueEl = document.getElementById(`voz_pitch_value_${voiceId}`);
+  const statusEl = document.getElementById(`voz_pitch_status_${voiceId}`);
+  if(!voice||!audio||!input) return;
+  const value = Math.max(-6,Math.min(6,Number(semitones)||0));
+  voice.pitchSemitones = value;
+  input.value = value;
+  if(valueEl) valueEl.textContent = pitchLabel(value);
+  if(statusEl) statusEl.textContent = 'Aplicando…';
+  try{
+    if(!window.PibuTransposer) throw new Error('O transpositor ainda está carregando. Tente novamente.');
+    await window.PibuTransposer.setPitch(audio,voiceId,value);
+    if(statusEl) statusEl.textContent = value===0 ? 'Áudio no tom original.' : 'Tom alterado sem mudar a velocidade.';
+  }catch(error){
+    console.error('setVoicePitch',error);
+    if(statusEl) statusEl.textContent = error.message||'Não foi possível alterar o tom neste navegador.';
+  }
 }
 
 async function hydrateVoices(songId){

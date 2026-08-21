@@ -5,6 +5,9 @@ import test from 'node:test';
 
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const legacyEntry = await readFile(new URL('../louvor.html', import.meta.url), 'utf8');
+const transposer = await readFile(new URL('../audio-transposer.js', import.meta.url), 'utf8');
+const soundTouchNode = await readFile(new URL('../vendor/soundtouch/SoundTouchNode.js', import.meta.url), 'utf8');
+const soundTouchProcessor = await readFile(new URL('../vendor/soundtouch/soundtouch-processor.js', import.meta.url), 'utf8');
 
 function inlineScripts(html) {
   return [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
@@ -50,4 +53,19 @@ test('a inicialização não grava nem importa automaticamente', () => {
 test('credencial administrativa antiga não está no HTML', () => {
   assert.doesNotMatch(index, /u\s*===\s*['"]lider['"]/);
   assert.doesNotMatch(index, /p\s*===\s*['"]1234['"]/);
+});
+
+test('cada voz reproduzível oferece transposição de -6 a +6 semitons', () => {
+  assert.match(index, /audio-transposer\.js/);
+  assert.match(index, /class="transposer-range" type="range" min="-6" max="6" step="1"/);
+  assert.match(index, /setVoicePitch\(/);
+  assert.match(index, /Tom alterado sem mudar a velocidade/);
+});
+
+test('transpositor usa AudioWorklet local e não muda a velocidade do elemento', () => {
+  assert.match(transposer, /new SoundTouchNode/);
+  assert.match(transposer, /pitchSemitones\.setValueAtTime/);
+  assert.doesNotMatch(transposer, /audio\.playbackRate\s*=/);
+  assert.match(soundTouchNode, /class SoundTouchNode extends AudioWorkletNode/);
+  assert.match(soundTouchProcessor, /registerProcessor/);
 });
