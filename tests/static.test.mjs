@@ -81,6 +81,16 @@ test('UX de vozes oferece filtro por classificação e indicador compacto de tom
   assert.doesNotMatch(index, /class="transposer-status"/);
 });
 
+test('vozes oferecem reprodução conjunta sincronizada e respeitam o filtro visível', () => {
+  assert.match(index, /id="voz_group_toggle"/);
+  assert.match(index, /function toggleVoiceGroupPlay/);
+  assert.match(index, /visibleVoiceAudios\(\)/);
+  assert.match(index, /Promise\.allSettled\(audios\.map\(audio=>audio\.play\(\)\)\)/);
+  assert.match(index, /audio\.currentTime=0/);
+  assert.match(index, /Math\.abs\(audio\.currentTime-masterTime\)>0\.12/);
+  assert.match(index, /Pausar todas/);
+});
+
 test('líder pode editar nome e tipo com confirmação do servidor', () => {
   assert.match(index, /function startEditVoice/);
   assert.match(index, /function saveVoiceEdit/);

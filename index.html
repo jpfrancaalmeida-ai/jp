@@ -209,6 +209,12 @@
   .voz-name.is-empty{color:var(--muted);font-style:italic;}
   .voz-actions{display:flex;gap:5px;flex:none;}
   .voz-actions .icon-btn{width:28px;height:28px;}
+  .voz-group-player{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;margin-bottom:5px;border:1px solid var(--line);border-radius:10px;background:var(--paper);}
+  .voz-group-copy{min-width:0;}
+  .voz-group-title{display:block;font-size:12px;font-weight:700;color:var(--ink);}
+  .voz-group-hint{display:block;margin-top:2px;font-size:10.5px;color:var(--muted);}
+  .voz-group-player .btn{flex:none;min-width:116px;justify-content:center;}
+  .voz-group-player .btn svg{width:13px;height:13px;}
   .voz-player{flex:1;min-width:0;}
   .voz-audio{width:100%; height:36px; min-width:0;display:block;}
   .voz-audio::-webkit-media-controls-panel{background:var(--paper);}
@@ -1916,6 +1922,7 @@ function setVoiceFilter(songId, type){
 function renderVozesList(songId){
   const wrap = document.getElementById('vozListWrap');
   if(!wrap) return;
+  clearVoiceGroupSync();
   window.PibuTransposer?.disposeWithin(wrap);
   const vozes = state.voices[songId] || [];
   if(vozes.length === 0){
@@ -1927,7 +1934,19 @@ function renderVozesList(songId){
     wrap.innerHTML = `<p class="voz-empty">Nenhum áudio de ${escapeHtml(state.voiceFilter.toLowerCase())} nesta música.</p>`;
     return;
   }
-  wrap.innerHTML = `<div style="margin-bottom:6px;">${filteredVoices.map(v=>`
+  const groupLabel = state.voiceFilter==='Todos' ? `${filteredVoices.length} vozes` : `${filteredVoices.length} ${state.voiceFilter.toLowerCase()}`;
+  wrap.innerHTML = `<div style="margin-bottom:6px;">
+    ${filteredVoices.length>1 ? `<div class="voz-group-player">
+      <div class="voz-group-copy">
+        <span class="voz-group-title">Ouvir em conjunto</span>
+        <span class="voz-group-hint">${escapeHtml(groupLabel)} sincronizadas</span>
+      </div>
+      <button class="btn btn-dark btn-sm" id="voz_group_toggle" onclick="toggleVoiceGroupPlay('${songId}')" aria-label="Tocar todas as vozes">
+        <svg class="voz-group-icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7Z"/></svg>
+        <span>Tocar todas</span>
+      </button>
+    </div>` : ''}
+    ${filteredVoices.map(v=>`
     <div class="voz-row">
       <div class="voz-row-head">
         <div class="voz-meta">
@@ -1946,7 +1965,7 @@ function renderVozesList(songId){
       ${state.editingVoiceId===v.id ? renderVoiceEditForm(songId,v) : ''}
       ${v.url||v.dataUrl||v.objectUrl
         ? `<div class="voz-player">
-            <audio id="voz_audio_${v.id}" data-transposer-id="${v.id}" class="voz-audio" controls preload="metadata" src="${escapeHtml(v.url||v.dataUrl||v.objectUrl)}"></audio>
+            <audio id="voz_audio_${v.id}" data-transposer-id="${v.id}" class="voz-audio" controls preload="metadata" src="${escapeHtml(v.url||v.dataUrl||v.objectUrl)}" onplay="updateVoiceGroupButton('${songId}')" onpause="updateVoiceGroupButton('${songId}')" onended="updateVoiceGroupButton('${songId}')"></audio>
             <div class="transposer" aria-label="Transpositor de tom">
               <span class="transposer-label">Tom</span>
               <button class="transposer-btn" onclick="adjustVoicePitch('${songId}','${v.id}',-1)" aria-label="Diminuir um semitom">−</button>
@@ -1960,6 +1979,69 @@ function renderVozesList(songId){
           </div>`
         : `<span class="hint" style="flex:1;">${v.loadError?'Falha ao carregar o áudio.':'Carregando áudio…'}</span>`}
     </div>`).join('')}</div>`;
+}
+
+let voiceGroupSyncTimer = null;
+
+function visibleVoiceAudios(){
+  return Array.from(document.querySelectorAll('#vozListWrap .voz-audio'));
+}
+
+function clearVoiceGroupSync(){
+  if(voiceGroupSyncTimer){
+    clearInterval(voiceGroupSyncTimer);
+    voiceGroupSyncTimer = null;
+  }
+}
+
+function updateVoiceGroupButton(songId){
+  const button = document.getElementById('voz_group_toggle');
+  if(!button) return;
+  const isPlaying = visibleVoiceAudios().some(audio=>!audio.paused&&!audio.ended);
+  button.innerHTML = isPlaying
+    ? `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg><span>Pausar todas</span>`
+    : `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7Z"/></svg><span>Tocar todas</span>`;
+  button.setAttribute('aria-label',isPlaying?'Pausar todas as vozes':'Tocar todas as vozes');
+}
+
+function startVoiceGroupSync(songId, audios){
+  clearVoiceGroupSync();
+  voiceGroupSyncTimer = setInterval(()=>{
+    if(!document.getElementById('voz_group_toggle')){ clearVoiceGroupSync(); return; }
+    const playing = audios.filter(audio=>audio.isConnected&&!audio.paused&&!audio.ended);
+    if(playing.length===0){ clearVoiceGroupSync(); updateVoiceGroupButton(songId); return; }
+    if(playing.length<2) return;
+    const masterTime = playing[0].currentTime;
+    playing.slice(1).forEach(audio=>{
+      if(Math.abs(audio.currentTime-masterTime)>0.12){
+        try{ audio.currentTime=masterTime; }catch(_error){}
+      }
+    });
+  },500);
+}
+
+async function toggleVoiceGroupPlay(songId){
+  const button = document.getElementById('voz_group_toggle');
+  const audios = visibleVoiceAudios();
+  if(!button||audios.length<2) return;
+  if(audios.some(audio=>!audio.paused&&!audio.ended)){
+    audios.forEach(audio=>audio.pause());
+    clearVoiceGroupSync();
+    updateVoiceGroupButton(songId);
+    return;
+  }
+  button.disabled = true;
+  clearVoiceGroupSync();
+  audios.forEach(audio=>{
+    audio.pause();
+    try{ audio.currentTime=0; }catch(_error){}
+  });
+  const results = await Promise.allSettled(audios.map(audio=>audio.play()));
+  const started = audios.filter((audio,index)=>results[index].status==='fulfilled'&&!audio.paused);
+  button.disabled = false;
+  updateVoiceGroupButton(songId);
+  if(started.length>1) startVoiceGroupSync(songId,started);
+  if(started.length!==audios.length) showToast('Algumas vozes não puderam ser reproduzidas.');
 }
 
 function renderVoiceEditForm(songId, voice){
