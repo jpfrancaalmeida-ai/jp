@@ -11,7 +11,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script type="module" src="./audio-transposer.js"></script>
-<script src="./voice-mixer.js"></script>
+<script src="./asset-reader.js?v=20261106-1"></script>
+<script src="./voice-mixer.js?v=20261106-1"></script>
 <link rel="stylesheet" href="./voice-mixer.css">
 <script>
   const firebaseConfig = {
@@ -551,6 +552,8 @@ let state = {
   agenda: [],
   tagDefs: [],
   voices: {},
+  assetLoadStatus: {},
+  voiceSongLoadStatus: {},
   voiceMeta: {},
   apoio: {},
   knownNames: [],
@@ -979,9 +982,16 @@ async function uploadAsset(collectionName, folder, songId, file, extra){
 
 async function assetObjectUrl(collectionName, item){
   if(item.objectUrl) return item.objectUrl;
-  const snapshot = await db.collection(collectionName).doc(item.id).collection('chunks').orderBy('index').get();
-  const parts = [];
-  snapshot.forEach(doc=>parts.push(doc.data().data));
+  const chunks=await getAssetReader().list(collectionName,{
+    ...await assetReadOptions(),assetId:item.id,
+    sdkRead:async()=>{
+      const snapshot=await db.collection(collectionName).doc(item.id).collection('chunks').orderBy('index').get({source:'server'});
+      const result=[];snapshot.forEach(doc=>result.push({id:doc.id,...doc.data()}));return result;
+    }
+  });
+  chunks.sort((a,b)=>a.index-b.index);
+  if(chunks.some((chunk,index)=>chunk.index!==index)) throw new Error('Os fragmentos do áudio estão incompletos.');
+  const parts=chunks.map(chunk=>chunk.data);
   if(parts.length !== item.chunkCount) throw new Error('O arquivo está incompleto no servidor.');
   const binary = atob(parts.join(''));
   const bytes = new Uint8Array(binary.length);
@@ -1001,16 +1011,55 @@ async function downloadChunkedAsset(collectionName, itemId, songId){
   }catch(e){ console.error('downloadChunkedAsset',e); showToast('Não foi possível carregar o arquivo.'); }
 }
 
-async function loadAssetCollection(collectionName, target){
+let assetReader;
+function getAssetReader(){
+  if(!assetReader) assetReader=new window.PibuAssetReader({projectId:firebaseConfig.projectId});
+  return assetReader;
+}
+async function assetReadOptions(){
+  return auth.currentUser?{token:await auth.currentUser.getIdToken()}:{};
+}
+async function loadAssetCollection(collectionName,target,songId=null){
+  state.assetLoadStatus[collectionName]='loading';
   try{
-    const snapshot = await db.collection(collectionName).get();
-    snapshot.forEach(doc=>{
-      const item = {id:doc.id, ...doc.data(), documentBacked:true};
-      if(!item.songId||item.uploadComplete===false) return;
-      if(!target[item.songId]) target[item.songId] = [];
-      if(!target[item.songId].some(existing=>existing.id===item.id)) target[item.songId].push(item);
+    const items=await getAssetReader().list(collectionName,{
+      ...await assetReadOptions(),songId,
+      sdkRead:async()=>{
+        let query=db.collection(collectionName);
+        if(songId) query=query.where('songId','==',songId);
+        const snapshot=await query.get({source:'server'});
+        const result=[];
+        snapshot.forEach(doc=>result.push({id:doc.id,...doc.data(),documentBacked:true}));
+        return result;
+      }
     });
-  }catch(e){ console.warn('loadAssetCollection', collectionName, e); }
+    for(const key of Object.keys(target)){
+      if(!songId||key===songId) target[key]=target[key].filter(item=>!item.documentBacked);
+    }
+    for(const item of items){
+      if(!item.songId||item.uploadComplete===false) continue;
+      if(!target[item.songId]) target[item.songId]=[];
+      if(!target[item.songId].some(existing=>existing.id===item.id)) target[item.songId].push(item);
+    }
+    state.assetLoadStatus[collectionName]='ready';
+    return true;
+  }catch(error){
+    state.assetLoadStatus[collectionName]='error';
+    console.warn('loadAssetCollection',collectionName,error);
+    return false;
+  }
+}
+async function loadVoicesForSong(songId){
+  state.voiceSongLoadStatus[songId]='loading';
+  const wrap=document.getElementById('vozListWrap');
+  if(wrap&&(!wrap.dataset.songId||wrap.dataset.songId===songId)) renderVozesList(songId);
+  const success=await loadAssetCollection('songVoices',state.voices,songId);
+  state.voiceSongLoadStatus[songId]=success?'ready':'error';
+  renderCatalog();
+  if(document.getElementById('vozListWrap')?.dataset.songId===songId){
+    renderVozesList(songId);
+    if(success) await hydrateVoices(songId);
+  }
 }
 async function doLogout(){
   await auth.signOut();
@@ -1103,7 +1152,7 @@ function renderCatalog(){
         </button>
         <button class="cifra-link" onclick="openVozesModal('${s.id}')" title="Vozes">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
-          Vozes${(state.voices[s.id]||[]).length ? ` (${(state.voices[s.id]||[]).length})` : ''}
+          Vozes${state.assetLoadStatus.songVoices==='error'?' · tentar novamente':''}${(state.voices[s.id]||[]).length ? ` (${(state.voices[s.id]||[]).length})` : ''}
         </button>
         <button class="cifra-link" onclick="openApoioModal('${s.id}')" title="Apoio">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
@@ -1908,8 +1957,12 @@ function openVozesModal(songId){
       <button class="btn btn-dark" onclick="closeModal()">Fechar</button>
     </div>`}
   `);
-  renderVozesList(songId);
-  hydrateVoices(songId);
+  if((state.voices[songId]||[]).length){
+    renderVozesList(songId);
+    hydrateVoices(songId);
+  }else{
+    loadVoicesForSong(songId);
+  }
 }
 
 function voiceFilterOptions(songId){
@@ -1951,7 +2004,15 @@ function renderVozesList(songId){
   const voices = state.voices[songId] || [];
   const song = state.songs.find(item=>item.id===songId);
   document.querySelector('.modal')?.classList.add('voice-mixer-modal');
-  if(voices.length===0){ wrap.innerHTML='<p class="voz-empty">Nenhuma voz adicionada ainda.</p>'; return; }
+  if(voices.length===0){
+    const status=state.voiceSongLoadStatus[songId]||state.assetLoadStatus.songVoices;
+    wrap.innerHTML=status==='loading'
+      ? '<p class="voz-empty" role="status">Consultando os áudios desta música…</p>'
+      : status==='error'
+        ? '<p class="voz-empty" role="alert">Não foi possível consultar os áudios. Confira sua conexão e tente novamente.</p><button class="btn btn-dark" onclick="loadVoicesForSong(\''+songId+'\')">Tentar novamente</button>'
+        : '<p class="voz-empty">Esta música ainda não recebeu áudios.</p>';
+    return;
+  }
   const sourceKeys = [...new Set(voices.map(voice=>voice.sourceKey).filter(Boolean))];
   const originalKey = sourceKeys.length===1 ? sourceKeys[0] : sourceKeys.length>1 ? '' : song?.tom||'';
   wrap.innerHTML = `<div class="voice-mixer">
@@ -2018,7 +2079,7 @@ function updateVoiceMixerUI(mixer){
   if(!wrap||!timeline) return;
   timeline.max=mixer.duration||0;
   timeline.value=mixer.time;
-  timeline.disabled=!mixer.ready;
+  timeline.disabled=!mixer.duration;
   timeline.setAttribute('aria-valuetext',`${mixTime(mixer.time)} de ${mixTime(mixer.duration)}`);
   document.getElementById('mix-current').textContent=mixTime(mixer.time);
   document.getElementById('mix-duration').textContent=mixTime(mixer.duration);
@@ -2030,10 +2091,10 @@ function updateVoiceMixerUI(mixer){
   document.getElementById('mix-master-value').textContent=mixer.masterVolume+'%';
   const pitch=document.getElementById('mix-pitch-reset');
   pitch.textContent=mixer.pitch===0?'Original'+(pitch.dataset.originalKey?' · '+pitch.dataset.originalKey:''):pitchLabel(mixer.pitch);
-  document.getElementById('mix-pitch-down').disabled=!mixer.ready||mixer.pitch<=-6;
-  document.getElementById('mix-pitch-up').disabled=!mixer.ready||mixer.pitch>=6;
-  pitch.disabled=!mixer.ready;
-  const statusText=voiceMixError||(mixer.buffering?'Aguardando as faixas carregarem…':mixer.ready?`${mixer.tracks.length} faixas sincronizadas. S: solar · M: mutar.`:'Carregando as faixas…');
+  document.getElementById('mix-pitch-down').disabled=!mixer.metadataReady||mixer.pitch<=-6;
+  document.getElementById('mix-pitch-up').disabled=!mixer.metadataReady||mixer.pitch>=6;
+  pitch.disabled=!mixer.metadataReady;
+  const statusText=voiceMixError||(mixer.buffering?'Aguardando as faixas carregarem…':mixer.ready?(mixer.duration?`${mixer.tracks.length} faixas sincronizadas. S: solar · M: mutar.`:'Toque em Reproduzir para iniciar os áudios.'):'Carregando as faixas…');
   const status=document.getElementById('mix-status');
   if(status.textContent!==statusText) status.textContent=statusText;
   for(const track of mixer.tracks){
@@ -2045,7 +2106,7 @@ function updateVoiceMixerUI(mixer){
     row.querySelector('[data-mix-action="mute"]').setAttribute('aria-pressed',String(track.muted));
     row.querySelector('[data-mix-volume]').value=track.volume;
     row.querySelector('[data-mix-volume-value]').textContent=track.volume+'%';
-    row.querySelector('[data-mix-state]').textContent=track.audio.error?'Falha ao carregar o áudio.':!track.audio.getAttribute('src')||track.audio.readyState<1?'Carregando áudio…':track.muted?'Mutada':track.audio.muted?'Fora do solo':track.solo?'Em solo':'Pronta';
+    row.querySelector('[data-mix-state]').textContent=track.audio.error?'Falha ao carregar o áudio.':!track.audio.getAttribute('src')?'Carregando áudio…':track.audio.readyState<1?'Pronta para iniciar':track.muted?'Mutada':track.audio.muted?'Fora do solo':track.solo?'Em solo':'Pronta';
   }
 }
 
@@ -2181,11 +2242,17 @@ async function setVoicePitch(songId, voiceId, semitones){
 }
 
 async function hydrateVoices(songId){
-  const voices = state.voices[songId]||[];
-  await Promise.all(voices.filter(v=>v.encoding==='base64-chunks'&&!v.objectUrl).map(async v=>{
-    try{ await assetObjectUrl('songVoices',v); }
-    catch(e){ v.loadError=true; console.error('hydrateVoice',v.id,e); }
-  }));
+  const voices=state.voices[songId]||[];
+  const pending=voices.filter(voice=>voice.encoding==='base64-chunks'&&!voice.objectUrl);
+  let cursor=0;
+  async function worker(){
+    while(cursor<pending.length){
+      const voice=pending[cursor++];
+      try{await assetObjectUrl('songVoices',voice);voice.loadError=false;}
+      catch(error){voice.loadError=true;console.error('hydrateVoice',voice.id,error);}
+    }
+  }
+  await Promise.all([worker(),worker()]);
   if(document.getElementById('vozListWrap')?.dataset.songId===songId) renderVozesList(songId);
 }
 

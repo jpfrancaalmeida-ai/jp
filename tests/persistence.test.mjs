@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import test from 'node:test';
+import { createRequire } from 'node:module';
+const { AssetReader } = createRequire(import.meta.url)('../asset-reader.js');
+class TestAssetReader extends AssetReader {
+  constructor(options) { super({ ...options, fetcher: async () => { throw new Error('REST indisponível no teste; usar SDK'); } }); }
+}
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
@@ -69,7 +74,8 @@ const db = {
 };
 
 const context = vm.createContext({
-  auth: { currentUser: { uid: 'leader-test' } },
+  auth: { currentUser: { uid: 'leader-test', getIdToken: async () => 'test-token' } },
+  firebaseConfig: { projectId: 'test-project' },
   console,
   confirm: () => true,
   db,
@@ -82,11 +88,11 @@ const context = vm.createContext({
   URL,
   setTimeout,
   clearTimeout,
-  window: {},
+  window: { PibuAssetReader: TestAssetReader },
 });
 
 const application = scripts.at(-1).replace(/init\(\);\s*$/, `
-globalThis.__persistenceTest = { uploadAsset, loadAssetCollection, saveKey, assetObjectUrl };
+globalThis.__persistenceTest = { uploadAsset, loadAssetCollection, saveKey, assetObjectUrl, state };
 `);
 new vm.Script(application, { filename: 'application-under-test.js' }).runInContext(context);
 
@@ -123,6 +129,17 @@ test('arquivo acima de 10 MB é recusado antes do upload', async () => {
     context.__persistenceTest.uploadAsset('songVoices', 'voices', 'song-1', oversized, {}),
     /10 MB/,
   );
+});
+
+test('falha na consulta retorna erro e preserva áudios já carregados', async () => {
+  const originalCollection = db.collection;
+  const target = { 'song-1': [{ id: 'existing', songId: 'song-1', documentBacked: true }] };
+  db.collection = () => ({ get: async () => { throw new Error('Sem conexão'); } });
+  try {
+    assert.equal(await context.__persistenceTest.loadAssetCollection('songVoices', target), false);
+    assert.equal(context.__persistenceTest.state.assetLoadStatus.songVoices, 'error');
+    assert.equal(target['song-1'][0].id, 'existing');
+  } finally { db.collection = originalCollection; }
 });
 
 test('edição textual só termina depois da releitura do servidor', async () => {

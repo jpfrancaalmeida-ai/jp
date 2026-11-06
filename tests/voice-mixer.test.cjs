@@ -8,6 +8,9 @@ class Audio extends EventTarget{
  pause(){this.paused=true;}
 }
 function fixture(t,durations=[180,180,180]){const audios=durations.map(d=>new Audio(d));const mixer=new VoiceMixer(audios.map((audio,index)=>({id:String(index),audio})));t.after(()=>mixer.destroy());return{mixer,audios};}
+test('celular que só carrega metadados após o toque consegue iniciar o áudio',async t=>{
+ const{mixer,audios}=fixture(t);audios.forEach(audio=>{audio.readyState=0;audio.duration=NaN;});assert.equal(mixer.ready,true);assert.equal(mixer.metadataReady,false);await mixer.play();assert(audios.every(audio=>!audio.paused));audios[0].dispatchEvent(new Event('waiting'));assert.equal(mixer.buffering,false);audios.forEach(audio=>{audio.readyState=4;audio.duration=180;audio.dispatchEvent(new Event('loadedmetadata'));});assert.equal(mixer.metadataReady,true);assert.equal(mixer.playing,true);
+});
 test('pausar e retomar preserva a posição de todas as faixas',async t=>{
  const{mixer,audios}=fixture(t);await mixer.play();audios.forEach(a=>a.currentTime=43);mixer.tick();mixer.pause();assert.equal(mixer.time,43);await mixer.play();assert(audios.every(a=>a.currentTime===43&&!a.paused));
 });

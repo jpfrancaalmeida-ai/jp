@@ -2,6 +2,11 @@
 
 ## Mixer de vozes
 
+- A leitura de vozes e fragmentos usa a API HTTP do Firestore, com alternativa pelo SDK. Erros de conexão não são apresentados como ausência de áudios.
+- Uma música sem vozes na memória é consultada novamente ao abrir o modal. Falhas oferecem “Tentar novamente”.
+- Os arquivos de áudio são carregados com duas transferências simultâneas para reduzir o pico de memória em celulares.
+- Em navegadores que adiam os metadados até o toque do usuário, o botão Reproduzir continua disponível quando o arquivo já foi obtido.
+
 - As faixas usam uma única linha do tempo, com reprodução, pausa e retorno ao início em conjunto.
 - Cada faixa oferece Solo (S), Mute (M) e volume independente. Várias faixas podem ficar em solo ao mesmo tempo; Mute tem prioridade.
 - Faixas silenciadas continuam acompanhando a posição da música, para voltarem no instante correto.

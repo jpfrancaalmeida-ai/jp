@@ -26,7 +26,8 @@
     listen(audio,event,handler){audio.addEventListener(event,handler);this.listeners.push([audio,event,handler]);}
     get available(){return this.tracks.filter(t=>t.audio.getAttribute('src')&&!t.audio.error);}
     get duration(){return Math.max(0,...this.available.map(t=>Number.isFinite(t.audio.duration)?t.audio.duration:0));}
-    get ready(){return this.available.length>0&&this.available.every(t=>t.audio.readyState>=1);}
+    get ready(){return this.available.length>0;}
+    get metadataReady(){return this.ready&&this.available.every(t=>t.audio.readyState>=1);}
     get master(){return this.available.reduce((best,t)=>!best||t.audio.duration>best.audio.duration?t:best,null);}
     align(track){if(track.audio.readyState>=1){try{const target=Math.min(this.time,Number.isFinite(track.audio.duration)?track.audio.duration:this.time);if(Math.abs(track.audio.currentTime-target)>.015)track.audio.currentTime=target;}catch(_error){}}}
     applyVolumes(){
@@ -65,6 +66,7 @@
     }
     waitForTracks(){
       if(!this.playing||this.buffering||this.destroyed)return;
+      if(!this.metadataReady)return;
       if(this.master)this.time=this.master.audio.currentTime;
       this.generation++;this.buffering=true;this.tracks.forEach(t=>t.audio.pause());this.update();
     }
