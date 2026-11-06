@@ -14,6 +14,7 @@
 - Faixas silenciadas continuam acompanhando a posição da música, para voltarem no instante correto.
 - Há volume geral e transposição conjunta de -6 a +6 semitons, sem mudar a velocidade.
 - O filtro “Exibir” muda apenas as faixas visíveis; Solo e Mute controlam a mixagem.
+- “Reiniciar saída de áudio” recria o contexto, preservando os buffers, posição, volumes, solo e mute. Permite recuperar a saída sem recarregar os arquivos.
 - Fechar o modal interrompe a reprodução. Editar uma identificação preserva a posição e os volumes, pausando o conjunto.
 - `voice-mixer.js` concentra o controle de reprodução; `voice-mixer.css` define o layout responsivo.
 - `npm test` inclui testes de sincronização, busca, volume, solo/mute, decodificação, interrupções do dispositivo e encerramento durante reprodução pendente.
@@ -54,9 +55,9 @@ O modo Líder usa Firebase Authentication com e-mail e senha. As regras versiona
 npm test
 ```
 
-O teste de navegador `tests/audio-render.html` renderiza três pistas com OfflineAudioContext e compara amostras PCM da soma, do solo e do mute. Ele verifica o áudio resultante, além do agendamento simultâneo.
+O teste de navegador `tests/audio-render.html` renderiza três pistas com OfflineAudioContext e compara amostras PCM da soma, do solo e do mute. Ele verifica o áudio resultante, além do agendamento simultâneo, e percorre 340 segundos em 44,1 e 48 kHz, incluindo 3:39.
 
-A decodificação preserva 44,1 kHz; projetos longos podem exigir bastante memória. Fechar o modal libera os buffers e o contexto de áudio.
+O AudioContext usa a frequência nativa do dispositivo e `latencyHint: playback`, evitando impor 44,1 kHz e latência mínima. A decodificação acompanha essa frequência; projetos longos podem exigir bastante memória. Fechar o modal libera os buffers e o contexto de áudio.
 
 ## Publicação
 

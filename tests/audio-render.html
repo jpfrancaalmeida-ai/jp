@@ -1,18 +1,20 @@
 <!doctype html><meta charset="utf-8"><title>Teste do motor multipista</title>
 <button id="run">Testar soma real das pistas</button><pre id="result">Aguardando</pre>
 <script src="../voice-mixer.js"></script><script>
-async function renderCase(mode){
- const offline=new OfflineAudioContext(1,22050,44100),starts=[];
+async function renderCase(mode,rate=44100){
+ const long=mode==='long',seconds=long?340:.5;
+ const offline=new OfflineAudioContext(1,Math.ceil(seconds*rate),rate),starts=[];
  const context={currentTime:0,state:'running',destination:offline.destination,createGain:()=>offline.createGain(),createBufferSource:()=>{const source=offline.createBufferSource(),original=source.start.bind(source);source.start=(...args)=>{starts.push(args);original(...args);};return source;},resume:async()=>{},close:async()=>{}};
- const buffers=[.1,.2,.3].map(value=>{const b=offline.createBuffer(1,13230,44100);b.getChannelData(0).fill(value);return b;});
+ const buffers=[.1,.2,.3].map(value=>{const b=offline.createBuffer(1,Math.ceil((seconds+.1)*rate),rate);b.getChannelData(0).fill(value);return b;});
  const mixer=new PibuVoiceMixer(buffers.map((buffer,i)=>({id:String(i),buffer})),{contextFactory:()=>context});
  if(mode==='solo')mixer.toggleSolo('1');if(mode==='mute')mixer.toggleMute('0');
  await mixer.play();const result=await offline.startRendering();
  const expected=(mode==='solo'?.2:mode==='mute'?.5:.6)*.8*.8/3;
- const actual=result.getChannelData(0)[6000];
+ const samples=long?[.2,216,219,220,339]:[.2];
+ let actual;for(const second of samples){actual=result.getChannelData(0)[Math.round(second*rate)];if(Math.abs(actual-expected)>1e-6)throw Error(`${mode} ${second}s: ${actual} != ${expected}`);}
  if(Math.abs(actual-expected)>1e-6)throw Error(`${mode}: ${actual} != ${expected}`);
  if(!starts.every(start=>JSON.stringify(start)===JSON.stringify(starts[0])))throw Error('Inícios diferentes');
- mixer.destroy();return `${mode}: soma PCM ${actual.toFixed(6)}; 3 pistas no mesmo instante`;
+ mixer.destroy();return `${mode}: soma PCM ${actual.toFixed(6)}; 3 pistas no mesmo instante; ${rate} Hz${long?'; 340s incluindo 3:39':''}`;
 }
-document.getElementById('run').onclick=async()=>{const out=document.getElementById('result');try{const results=[];for(const mode of ['all','solo','mute'])results.push(await renderCase(mode));out.textContent='PASS\n'+results.join('\n');}catch(error){out.textContent='FAIL '+error.stack;}};
+document.getElementById('run').onclick=async()=>{const out=document.getElementById('result');try{const results=[];for(const mode of ['all','solo','mute'])results.push(await renderCase(mode));for(const rate of [44100,48000])results.push(await renderCase('long',rate));out.textContent='PASS\n'+results.join('\n');}catch(error){out.textContent='FAIL '+error.stack;}};
 </script>

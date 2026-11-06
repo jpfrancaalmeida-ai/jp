@@ -46,3 +46,14 @@ test('device interruption pauses the whole project at its clock position',async 
 test('snapshot preserves project position, volumes, solo and mute',async t=>{
  const {mixer}=fixture(t);mixer.seek(20);mixer.toggleSolo('0');mixer.toggleMute('1');mixer.setTrackVolume('2',55);const restored=fixture(t,[180,180,180],{saved:mixer.snapshot()}).mixer;assert.equal(restored.time,20);assert(restored.tracks[0].solo);assert(restored.tracks[1].muted);assert.equal(restored.tracks[2].volume,55);
 });
+test('default device frequency and playback latency are used instead of forced resampling',async t=>{
+ const previous=globalThis.AudioContext;let settings;
+ globalThis.AudioContext=class extends Context {constructor(options){super();settings=options;}};
+ const mixer=new Mixer([{id:'a',buffer:{duration:338}}]);t.after(()=>{mixer.destroy();globalThis.AudioContext=previous;});await mixer.play();assert.deepEqual(settings,{latencyHint:'playback'});assert(!('sampleRate' in settings));
+});
+test('audio output recovery at 3:39 creates a new device and retains every track and setting',async t=>{
+ const contexts=[];const mixer=new Mixer([0,1,2].map(id=>({id:String(id),buffer:{duration:338}})),{contextFactory:()=>{const ctx=new Context();contexts.push(ctx);return ctx;}});t.after(()=>mixer.destroy());mixer.setTrackVolume('1',65);mixer.toggleSolo('1');mixer.toggleMute('2');await mixer.play();contexts[0].currentTime=229.06;assert.equal(mixer.time,219);const buffers=mixer.tracks.map(t=>t.buffer);await mixer.resetOutput();assert.equal(contexts.length,2);assert(contexts[0].closed);assert(contexts[0].sources.every(s=>s.stopped));assert.deepEqual(mixer.tracks.map(t=>t.buffer),buffers);assert(contexts[1].sources.every(s=>s.startArgs[1]===219));assert.equal(mixer.tracks[1].gain.gain.value,.65);assert.equal(mixer.tracks[2].gain.gain.value,0);assert(mixer.playing);
+});
+test('cancel while output recovery is pending cannot restart playback',async t=>{
+ let count=0,release;const mixer=new Mixer([{id:'a',buffer:{duration:338}}],{contextFactory:()=>{const ctx=new Context();if(count++)ctx.resume=()=>new Promise(resolve=>release=resolve);return ctx;}});t.after(()=>mixer.destroy());await mixer.play();const pending=mixer.resetOutput();mixer.pause();release();await pending;assert(!mixer.playing);assert.equal(mixer.context.sources.length,0);
+});

@@ -49,3 +49,8 @@
  .voz-modal-title h3{white-space:normal;}
  .mix-track{padding:12px;}
 }
+
+.mix-recover{display:block;margin:16px auto 0;padding:8px 12px;border:1px solid #ffffff40;border-radius:8px;color:var(--paper);background:transparent;font:inherit;font-size:11px;cursor:pointer;}
+.mix-recover:hover{background:#ffffff18;}
+
+.mix-recover:disabled{opacity:.45;cursor:default;}

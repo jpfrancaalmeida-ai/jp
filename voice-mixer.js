@@ -17,7 +17,7 @@ class VoiceMixer {
   if(this.context)return;
   const Context=root.AudioContext||root.webkitAudioContext;
   if(!Context&&!this.options.contextFactory)throw Error('Este navegador não oferece mixagem de áudio.');
-  const ctx=this.context=this.options.contextFactory?this.options.contextFactory():new Context({sampleRate:44100,latencyHint:'interactive'});
+  const ctx=this.context=this.options.contextFactory?this.options.contextFactory():new Context({latencyHint:'playback'});
   this.bus=ctx.createGain();this.gate=ctx.createGain();this.master=ctx.createGain();
   // Constant headroom prevents clipping without pumping as voices enter or leave.
   this.bus.gain.value=1/this.tracks.length;this.gate.gain.value=0;
@@ -77,7 +77,22 @@ class VoiceMixer {
  async setPitch(v){const next=Math.max(-6,Math.min(6,Number(v)||0)),previous=this.pitch,resume=this.playing;this.pause();this.pitch=next;try{if(this.context&&!resume&&!await this.routePitch(next,this.generation))return;this.update();if(resume)return this.play();}catch(error){this.pitch=previous;this.onError(error.message);if(resume)return this.play();}}
  snapshot(){return {time:this.time,masterVolume:this.masterVolume,pitch:this.pitch,tracks:Object.fromEntries(this.tracks.map(t=>[t.id,{volume:t.volume,solo:t.solo,muted:t.muted}]))};}
  update(){if(!this.destroyed)this.onUpdate(this);}
- destroy(){if(this.destroyed)return;this.pause();this.destroyed=true;clearInterval(this.timer);this.abort.abort();this.processor?.disconnect();this.processor?.port?.close();for(const t of this.tracks){t.gain?.disconnect();t.buffer=null;}this.bus?.disconnect();this.gate?.disconnect();this.master?.disconnect();if(this.context){this.context.onstatechange=null;void this.context.close().catch(()=>{});}}
+ disconnectGraph(){
+  this.processor?.disconnect();this.processor?.port?.close();this.processor=null;
+  for(const t of this.tracks){t.gain?.disconnect();t.gain=null;}
+  this.bus?.disconnect();this.gate?.disconnect();this.master?.disconnect();this.bus=this.gate=this.master=null;
+  const previous=this.context;this.context=null;
+  if(previous){previous.onstatechange=null;void previous.close().catch(()=>{});}
+ }
+ async resetOutput(){
+  if(this.destroyed)return;
+  const resume=this.playing;this.pause();const generation=this.generation;this.disconnectGraph();
+  // Reopen in this tap; keep decoded tracks, position and all fader/solo states.
+  try{this.ensureContext();const unlocked=this.context.resume();await unlocked;if(this.destroyed||generation!==this.generation)return;if(resume)return this.play();this.update();}
+  catch(error){if(!this.destroyed)this.onError(error.message||'Não foi possível reiniciar a saída de áudio.');}
+ }
+ destroy(){if(this.destroyed)return;this.pause();this.destroyed=true;clearInterval(this.timer);this.abort.abort();this.disconnectGraph();for(const t of this.tracks)t.buffer=null;}
+
 }
 root.PibuVoiceMixer=VoiceMixer;if(typeof module!=='undefined'&&module.exports)module.exports=VoiceMixer;
 })(typeof window!=='undefined'?window:globalThis);
