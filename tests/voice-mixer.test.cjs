@@ -6,6 +6,7 @@ class Node {constructor(){this.gain=new Param();this.connections=[];}connect(n){
 class Context {
  constructor(){this.currentTime=10;this.state='running';this.destination={};this.sources=[];this.events=[];}
  createGain(){return new Node();}
+ createDynamicsCompressor(){const n=new Node();for(const key of ['threshold','knee','ratio','attack','release'])n[key]=new Param();return n;}
  createBufferSource(){const n=new Node();n.start=(when,offset)=>{n.startArgs=[when,offset];this.events.push('start');};n.stop=()=>n.stopped=true;this.sources.push(n);return n;}
  async resume(){this.events.push('resume');}
  async close(){this.closed=true;}
@@ -56,4 +57,8 @@ test('audio output recovery at 3:39 creates a new device and retains every track
 });
 test('cancel while output recovery is pending cannot restart playback',async t=>{
  let count=0,release;const mixer=new Mixer([{id:'a',buffer:{duration:338}}],{contextFactory:()=>{const ctx=new Context();if(count++)ctx.resume=()=>new Promise(resolve=>release=resolve);return ctx;}});t.after(()=>mixer.destroy());await mixer.play();const pending=mixer.resetOutput();mixer.pause();release();await pending;assert(!mixer.playing);assert.equal(mixer.context.sources.length,0);
+});
+
+test('original track level is retained even when six other tracks exist or are muted',async t=>{
+ const {mixer}=fixture(t,Array(7).fill(338));await mixer.play();mixer.setMasterVolume(100);mixer.setTrackVolume('0',100);mixer.toggleSolo('0');assert.equal(mixer.bus.gain.value,1);assert.equal(mixer.tracks[0].gain.gain.value,1);assert.equal(mixer.master.gain.value,1);assert.equal(mixer.master.connections[0],mixer.limiter);assert.equal(mixer.limiter.ratio.value,20);
 });

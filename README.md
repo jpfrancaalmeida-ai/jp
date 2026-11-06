@@ -10,6 +10,7 @@
 - O motor usa um único AudioContext e decodifica todas as pistas antes de iniciar. Todos os AudioBufferSourceNodes começam no mesmo instante do relógio de áudio, sem correções periódicas de posição.
 - O primeiro toque desbloqueia a saída de áudio antes de qualquer operação assíncrona, inclusive em iOS.
 - As faixas usam uma única linha do tempo, com reprodução, pausa e retorno ao início em conjunto.
+- O nível original das faixas é preservado, sem divisão pelo número de pistas. Um DynamicsCompressorNode no barramento final protege os picos (limiar −3 dB, razão 20:1).
 - Cada faixa oferece Solo (S), Mute (M) e volume independente. Várias faixas podem ficar em solo ao mesmo tempo; Mute tem prioridade.
 - Faixas silenciadas continuam acompanhando a posição da música, para voltarem no instante correto.
 - Há volume geral e transposição conjunta de -6 a +6 semitons, sem mudar a velocidade.

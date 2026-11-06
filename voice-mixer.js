@@ -19,9 +19,12 @@ class VoiceMixer {
   if(!Context&&!this.options.contextFactory)throw Error('Este navegador não oferece mixagem de áudio.');
   const ctx=this.context=this.options.contextFactory?this.options.contextFactory():new Context({latencyHint:'playback'});
   this.bus=ctx.createGain();this.gate=ctx.createGain();this.master=ctx.createGain();
-  // Constant headroom prevents clipping without pumping as voices enter or leave.
-  this.bus.gain.value=1/this.tracks.length;this.gate.gain.value=0;
-  this.bus.connect(this.gate);this.gate.connect(this.master);this.master.connect(ctx.destination);
+  // Preserve source level, including solo tracks. Catch peaks only at the output.
+  this.bus.gain.value=1;this.gate.gain.value=0;
+  this.limiter=ctx.createDynamicsCompressor();
+  this.limiter.threshold.value=-3;this.limiter.knee.value=0;this.limiter.ratio.value=20;
+  this.limiter.attack.value=.003;this.limiter.release.value=.15;
+  this.bus.connect(this.gate);this.gate.connect(this.master);this.master.connect(this.limiter);this.limiter.connect(ctx.destination);
   for(const t of this.tracks){t.gain=ctx.createGain();t.gain.connect(this.bus);}this.applyVolumes();
   ctx.onstatechange=()=>{if(this.started&&ctx.state!=='running'&&!this.destroyed){this.pause();this.onError('Áudio interrompido pelo dispositivo. Toque em Reproduzir para continuar.');}};
  }
@@ -80,7 +83,7 @@ class VoiceMixer {
  disconnectGraph(){
   this.processor?.disconnect();this.processor?.port?.close();this.processor=null;
   for(const t of this.tracks){t.gain?.disconnect();t.gain=null;}
-  this.bus?.disconnect();this.gate?.disconnect();this.master?.disconnect();this.bus=this.gate=this.master=null;
+  this.bus?.disconnect();this.gate?.disconnect();this.master?.disconnect();this.limiter?.disconnect();this.bus=this.gate=this.master=this.limiter=null;
   const previous=this.context;this.context=null;
   if(previous){previous.onstatechange=null;void previous.close().catch(()=>{});}
  }
