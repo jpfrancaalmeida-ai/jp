@@ -10,9 +10,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-<script type="module" src="./audio-transposer.js"></script>
+<script type="module" src="./audio-transposer.js?v=20261106-2"></script>
 <script src="./asset-reader.js?v=20261106-1"></script>
-<script src="./voice-mixer.js?v=20261106-1"></script>
+<script src="./voice-mixer.js?v=20261106-2"></script>
 <link rel="stylesheet" href="./voice-mixer.css">
 <script>
   const firebaseConfig = {
@@ -1077,7 +1077,7 @@ function openModal(html){
 function closeModal(){
   destroyVoiceMixer();
   document.querySelector('.modal')?.classList.remove('voice-mixer-modal');
-  window.PibuTransposer?.disposeWithin(document.getElementById('modalContent'));
+
   document.getElementById('overlay').classList.remove('show');
 }
 document.getElementById('overlay').addEventListener('click', e=>{
@@ -2000,7 +2000,7 @@ function renderVozesList(songId){
   if(!wrap) return;
   wrap.dataset.songId = songId;
   destroyVoiceMixer();
-  window.PibuTransposer?.disposeWithin(wrap);
+
   const voices = state.voices[songId] || [];
   const song = state.songs.find(item=>item.id===songId);
   document.querySelector('.modal')?.classList.add('voice-mixer-modal');
@@ -2054,20 +2054,19 @@ function renderVozesList(songId){
           <output data-mix-volume-value>80%</output>
         </div>
         <p class="mix-track-state" data-mix-state>Carregando áudio…</p>
-        <audio id="voz_audio_${voice.id}" data-transposer-id="${voice.id}" preload="auto" ${voice.url||voice.dataUrl||voice.objectUrl?`src="${escapeHtml(voice.url||voice.dataUrl||voice.objectUrl)}"`:''}></audio>
         ${state.isAdmin?`<div class="voz-actions"><button class="icon-btn" onclick="startEditVoice('${songId}','${voice.id}')" aria-label="Editar ${escapeHtml(voice.nome||voice.tipo||'voz')}">✎</button><button class="icon-btn" onclick="deleteVoz('${songId}','${voice.id}')" aria-label="Remover ${escapeHtml(voice.nome||voice.tipo||'voz')}">×</button></div>`:''}
         ${state.editingVoiceId===voice.id?renderVoiceEditForm(songId,voice):''}
       </article>`).join('')}
     </section>
   </div>`;
-  const mixerTracks = voices.map(voice=>({id:voice.id,audio:document.getElementById(`voz_audio_${voice.id}`)}));
+  const mixerTracks = voices.map(voice=>({id:voice.id,url:voice.url||voice.dataUrl||voice.objectUrl}));
   voiceMixer = new window.PibuVoiceMixer(mixerTracks,{
     saved:voiceMixSaved,
     onUpdate:updateVoiceMixerUI,
     onError:message=>{ voiceMixError=message; document.getElementById('mix-status').textContent=message; },
-    applyPitch:(audio,id,value)=>{
+    createPitchProcessor:context=>{
       if(!window.PibuTransposer) return Promise.reject(new Error('O transpositor ainda está carregando. Tente novamente.'));
-      return window.PibuTransposer.setPitch(audio,id,value);
+      return window.PibuTransposer.createBus(context);
     }
   });
   setVoiceFilter(songId,state.voiceFilter||'Todos');
@@ -2085,7 +2084,7 @@ function updateVoiceMixerUI(mixer){
   document.getElementById('mix-duration').textContent=mixTime(mixer.duration);
   const play=document.getElementById('voz_group_toggle');
   play.disabled=!mixer.ready;
-  play.textContent=mixer.playing?'Ⅱ Pausar':'▶ Reproduzir';
+  play.textContent=mixer.preparing?'Cancelar carregamento':mixer.playing?'Ⅱ Pausar':'▶ Reproduzir';
   play.setAttribute('aria-label',mixer.playing?'Pausar todas as faixas':'Reproduzir todas as faixas');
   document.getElementById('mix-master-volume').value=mixer.masterVolume;
   document.getElementById('mix-master-value').textContent=mixer.masterVolume+'%';
@@ -2094,19 +2093,20 @@ function updateVoiceMixerUI(mixer){
   document.getElementById('mix-pitch-down').disabled=!mixer.metadataReady||mixer.pitch<=-6;
   document.getElementById('mix-pitch-up').disabled=!mixer.metadataReady||mixer.pitch>=6;
   pitch.disabled=!mixer.metadataReady;
-  const statusText=voiceMixError||(mixer.buffering?'Aguardando as faixas carregarem…':mixer.ready?(mixer.duration?`${mixer.tracks.length} faixas sincronizadas. S: solar · M: mutar.`:'Toque em Reproduzir para iniciar os áudios.'):'Carregando as faixas…');
+  const statusText=voiceMixError||(mixer.preparing?`Preparando pistas: ${mixer.loadedCount}/${mixer.tracks.length}…`:mixer.ready?(mixer.duration?`${mixer.tracks.length} faixas sincronizadas. S: solar · M: mutar.`:'Toque em Reproduzir para iniciar os áudios.'):'Carregando as faixas…');
   const status=document.getElementById('mix-status');
   if(status.textContent!==statusText) status.textContent=statusText;
   for(const track of mixer.tracks){
     const row=Array.from(wrap.querySelectorAll('.mix-track')).find(item=>item.dataset.voiceId===track.id);
     if(!row) continue;
     row.classList.toggle('is-solo',track.solo);
-    row.classList.toggle('is-silent',track.audio.muted||track.volume===0);
+    row.classList.toggle('is-silent',track.effectiveMuted||track.volume===0);
     row.querySelector('[data-mix-action="solo"]').setAttribute('aria-pressed',String(track.solo));
     row.querySelector('[data-mix-action="mute"]').setAttribute('aria-pressed',String(track.muted));
     row.querySelector('[data-mix-volume]').value=track.volume;
     row.querySelector('[data-mix-volume-value]').textContent=track.volume+'%';
-    row.querySelector('[data-mix-state]').textContent=track.audio.error?'Falha ao carregar o áudio.':!track.audio.getAttribute('src')?'Carregando áudio…':track.audio.readyState<1?'Pronta para iniciar':track.muted?'Mutada':track.audio.muted?'Fora do solo':track.solo?'Em solo':'Pronta';
+    row.dataset.playbackState=track.source?'playing':track.loading?'loading':'stopped';
+    row.querySelector('[data-mix-state]').textContent=track.error?'Falha ao preparar o áudio.':track.loading?'Preparando áudio…':!track.url&&!track.buffer?'Carregando áudio…':track.muted?'Mutada':track.effectiveMuted?'Fora do solo':track.solo?'Em solo':track.source?'Em reprodução':'Pronta';
   }
 }
 
@@ -2206,39 +2206,6 @@ async function saveVoiceEdit(songId, voiceId){
 function pitchLabel(semitones){
   const value = Number(semitones)||0;
   return value===0 ? 'Original' : `${value>0?'+':''}${value} semitom${Math.abs(value)===1?'':'s'}`;
-}
-
-function adjustVoicePitch(songId, voiceId, delta){
-  const input = document.getElementById(`voz_pitch_${voiceId}`);
-  if(!input) return;
-  setVoicePitch(songId,voiceId,Number(input.value)+delta);
-}
-
-async function setVoicePitch(songId, voiceId, semitones){
-  const voice = (state.voices[songId]||[]).find(item=>item.id===voiceId);
-  const audio = document.getElementById(`voz_audio_${voiceId}`);
-  const input = document.getElementById(`voz_pitch_${voiceId}`);
-  const valueEl = document.getElementById(`voz_pitch_value_${voiceId}`);
-  const statusEl = document.getElementById(`voz_pitch_status_${voiceId}`);
-  if(!voice||!audio||!input) return;
-  const value = Math.max(-6,Math.min(6,Number(semitones)||0));
-  voice.pitchSemitones = value;
-  input.value = value;
-  if(valueEl){
-    valueEl.querySelector('.transposer-state-text').textContent = pitchLabel(value);
-    valueEl.classList.toggle('is-original',value===0);
-    valueEl.classList.toggle('is-shifted',value!==0);
-    valueEl.setAttribute('aria-label',value===0?'Tom original':'Voltar ao tom original');
-  }
-  if(statusEl) statusEl.textContent = 'Aplicando…';
-  try{
-    if(!window.PibuTransposer) throw new Error('O transpositor ainda está carregando. Tente novamente.');
-    await window.PibuTransposer.setPitch(audio,voiceId,value);
-    if(statusEl) statusEl.textContent = value===0 ? 'Áudio no tom original.' : 'Tom alterado sem mudar a velocidade.';
-  }catch(error){
-    console.error('setVoicePitch',error);
-    if(statusEl) statusEl.textContent = error.message||'Não foi possível alterar o tom neste navegador.';
-  }
 }
 
 async function hydrateVoices(songId){

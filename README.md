@@ -7,6 +7,8 @@
 - Os arquivos de áudio são carregados com duas transferências simultâneas para reduzir o pico de memória em celulares.
 - Em navegadores que adiam os metadados até o toque do usuário, o botão Reproduzir continua disponível quando o arquivo já foi obtido.
 
+- O motor usa um único AudioContext e decodifica todas as pistas antes de iniciar. Todos os AudioBufferSourceNodes começam no mesmo instante do relógio de áudio, sem correções periódicas de posição.
+- O primeiro toque desbloqueia a saída de áudio antes de qualquer operação assíncrona, inclusive em iOS.
 - As faixas usam uma única linha do tempo, com reprodução, pausa e retorno ao início em conjunto.
 - Cada faixa oferece Solo (S), Mute (M) e volume independente. Várias faixas podem ficar em solo ao mesmo tempo; Mute tem prioridade.
 - Faixas silenciadas continuam acompanhando a posição da música, para voltarem no instante correto.
@@ -14,7 +16,7 @@
 - O filtro “Exibir” muda apenas as faixas visíveis; Solo e Mute controlam a mixagem.
 - Fechar o modal interrompe a reprodução. Editar uma identificação preserva a posição e os volumes, pausando o conjunto.
 - `voice-mixer.js` concentra o controle de reprodução; `voice-mixer.css` define o layout responsivo.
-- `npm test` inclui testes de sincronização, busca, volume, solo/mute, buffering e encerramento durante reprodução pendente.
+- `npm test` inclui testes de sincronização, busca, volume, solo/mute, decodificação, interrupções do dispositivo e encerramento durante reprodução pendente.
 
 Aplicativo estático do ministério de louvor, publicado no Netlify e conectado ao Firebase.
 
@@ -34,10 +36,10 @@ O modo Líder usa Firebase Authentication com e-mail e senha. As regras versiona
 
 ## Transpositor de áudio
 
-- Cada gravação da área Vozes pode ser transposta de -6 a +6 semitons em tempo real, sem alterar a velocidade e sem gravar uma nova cópia no Firebase.
+- O projeto inteiro da área Vozes pode ser transposto de -6 a +6 semitons em tempo real, sem alterar a velocidade e sem gravar uma nova cópia no Firebase.
 - A lista pode ser filtrada por Melodia, Tenor, Contralto ou Soprano.
 - Líderes podem editar o nome e o tipo de uma gravação. Nos áudios legados, a edição é guardada em um pequeno documento de metadados para não regravar o arquivo Base64 próximo do limite do Firestore.
-- O processamento usa a Web Audio API no aparelho do visitante. A implementação inclui localmente o SoundTouchJS 2.1.1 sob a licença MPL-2.0, preservada em `vendor/soundtouch/LICENSE`.
+- A transposição usa um único processador depois da soma das pistas. O processamento usa a Web Audio API no aparelho do visitante. A implementação inclui localmente o SoundTouchJS 2.1.1 sob a licença MPL-2.0, preservada em `vendor/soundtouch/LICENSE`.
 
 ## Materiais de apoio
 
@@ -52,7 +54,9 @@ O modo Líder usa Firebase Authentication com e-mail e senha. As regras versiona
 npm test
 ```
 
-Antes de publicar, validar com Firebase Emulator Suite e confirmar o ciclo de upload, recarregamento e reprodução do arquivo.
+O teste de navegador `tests/audio-render.html` renderiza três pistas com OfflineAudioContext e compara amostras PCM da soma, do solo e do mute. Ele verifica o áudio resultante, além do agendamento simultâneo.
+
+A decodificação preserva 44,1 kHz; projetos longos podem exigir bastante memória. Fechar o modal libera os buffers e o contexto de áudio.
 
 ## Publicação
 

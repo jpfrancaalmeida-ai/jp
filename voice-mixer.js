@@ -1,99 +1,83 @@
 (function(root){
-  'use strict';
-  class VoiceMixer {
-    constructor(tracks, options={}) {
-      this.tracks=tracks.map(track=>({...track,volume:options.saved?.tracks?.[track.id]?.volume??80,solo:options.saved?.tracks?.[track.id]?.solo??false,muted:options.saved?.tracks?.[track.id]?.muted??false}));
-      this.time=options.saved?.time||0;
-      this.masterVolume=options.saved?.masterVolume??80;
-      this.pitch=options.saved?.pitch||0;
-      this.onUpdate=options.onUpdate||(()=>{});
-      this.onError=options.onError||(()=>{});
-      this.applyPitch=options.applyPitch;
-      this.playing=false;this.buffering=false;this.destroyed=false;this.generation=0;this.listeners=[];
-      for(const track of this.tracks){
-        this.listen(track.audio,'loadedmetadata',()=>{this.align(track);if(this.pitch&&this.applyPitch)void this.applyPitch(track.audio,track.id,this.pitch).catch(error=>this.onError(error.message));this.update();});
-        this.listen(track.audio,'canplay',()=>this.tick());
-        this.listen(track.audio,'waiting',()=>this.waitForTracks());
-        this.listen(track.audio,'ended',()=>this.tick());
-        this.listen(track.audio,'error',()=>{this.pause();this.onError('Uma faixa não pôde ser carregada. Feche e abra as vozes para tentar novamente.');});
-        this.align(track);
-      }
-      this.applyVolumes();
-      if(this.pitch&&this.applyPitch)this.available.filter(t=>t.audio.readyState>=1).forEach(t=>{void this.applyPitch(t.audio,t.id,this.pitch).catch(error=>this.onError(error.message));});
-      this.timer=setInterval(()=>this.tick(),150);
-      this.update();
-    }
-    listen(audio,event,handler){audio.addEventListener(event,handler);this.listeners.push([audio,event,handler]);}
-    get available(){return this.tracks.filter(t=>t.audio.getAttribute('src')&&!t.audio.error);}
-    get duration(){return Math.max(0,...this.available.map(t=>Number.isFinite(t.audio.duration)?t.audio.duration:0));}
-    get ready(){return this.available.length>0;}
-    get metadataReady(){return this.ready&&this.available.every(t=>t.audio.readyState>=1);}
-    get master(){return this.available.reduce((best,t)=>!best||t.audio.duration>best.audio.duration?t:best,null);}
-    align(track){if(track.audio.readyState>=1){try{const target=Math.min(this.time,Number.isFinite(track.audio.duration)?track.audio.duration:this.time);if(Math.abs(track.audio.currentTime-target)>.015)track.audio.currentTime=target;}catch(_error){}}}
-    applyVolumes(){
-      const solo=this.tracks.some(t=>t.solo);
-      this.tracks.forEach(t=>{t.audio.volume=(t.volume/100)*(this.masterVolume/100);t.audio.muted=t.muted||(solo&&!t.solo);});
-    }
-    setMasterVolume(value){this.masterVolume=Math.max(0,Math.min(100,Number(value)||0));this.applyVolumes();this.update();}
-    setTrackVolume(id,value){const track=this.tracks.find(t=>t.id===id);if(!track)return;track.volume=Math.max(0,Math.min(100,Number(value)||0));this.applyVolumes();this.update();}
-    toggleSolo(id){const track=this.tracks.find(t=>t.id===id);if(!track)return;track.solo=!track.solo;this.applyVolumes();this.update();}
-    toggleMute(id){const track=this.tracks.find(t=>t.id===id);if(!track)return;track.muted=!track.muted;this.applyVolumes();this.update();}
-    async play(){
-      if(this.destroyed||!this.ready)return;
-      const generation=++this.generation;
-      if(this.duration&&this.time>=this.duration-.03)this.time=0;
-      this.playing=true;this.buffering=false;
-      this.tracks.forEach(t=>this.align(t));
-      const targets=this.available.filter(t=>!Number.isFinite(t.audio.duration)||this.time<t.audio.duration-.02);
-      this.update();
-      const results=await Promise.allSettled(targets.map(t=>t.audio.play()));
-      if(this.destroyed||generation!==this.generation){if(!this.playing)this.tracks.forEach(t=>t.audio.pause());return;}
-      if(results.some(r=>r.status==='rejected')){this.pause();this.onError('Não foi possível iniciar todas as faixas. Toque em Reproduzir para tentar novamente.');return;}
-      this.update();
-    }
-    pause(){
-      this.generation++;
-      if(this.playing&&!this.buffering&&this.master)this.time=this.master.audio.currentTime;
-      this.playing=false;this.buffering=false;this.tracks.forEach(t=>t.audio.pause());this.update();
-    }
-    toggle(){return this.playing?this.pause():this.play();}
-    seek(value){
-      const wasPlaying=this.playing;
-      this.generation++;this.tracks.forEach(t=>t.audio.pause());
-      this.time=Math.max(0,Math.min(this.duration,Number(value)||0));
-      this.playing=false;this.buffering=false;this.tracks.forEach(t=>this.align(t));this.update();
-      if(wasPlaying&&this.time<this.duration)return this.play();
-    }
-    waitForTracks(){
-      if(!this.playing||this.buffering||this.destroyed)return;
-      if(!this.metadataReady)return;
-      if(this.master)this.time=this.master.audio.currentTime;
-      this.generation++;this.buffering=true;this.tracks.forEach(t=>t.audio.pause());this.update();
-    }
-    tick(){
-      if(this.destroyed)return;
-      if(this.buffering){
-        if(this.available.every(t=>t.audio.readyState>=3||this.time>=t.audio.duration)){this.buffering=false;void this.play();}
-        return;
-      }
-      if(this.playing&&this.master){
-        this.time=this.master.audio.currentTime;
-        if(this.master.audio.ended||this.time>=this.duration-.02){this.pause();this.time=this.duration;this.update();return;}
-        this.available.forEach(t=>{if(t!==this.master&&!t.audio.ended&&Math.abs(t.audio.currentTime-this.time)>.08)this.align(t);});
-      }
-      this.update();
-    }
-    async setPitch(value){
-      const next=Math.max(-6,Math.min(6,Number(value)||0));
-      const previous=this.pitch;
-      if(!this.applyPitch||!this.available.length)return;
-      try{await Promise.all(this.available.map(t=>this.applyPitch(t.audio,t.id,next)));if(this.destroyed)return;this.pitch=next;this.update();}
-      catch(error){if(this.destroyed)return;await Promise.allSettled(this.available.map(t=>this.applyPitch(t.audio,t.id,previous)));this.onError(error.message||'Não foi possível mudar o tom.');}
-    }
-    snapshot(){return {time:this.time,masterVolume:this.masterVolume,pitch:this.pitch,tracks:Object.fromEntries(this.tracks.map(t=>[t.id,{volume:t.volume,solo:t.solo,muted:t.muted}]))};}
-    update(){if(!this.destroyed)this.onUpdate(this);}
-    destroy(){if(this.destroyed)return;this.pause();this.destroyed=true;clearInterval(this.timer);this.listeners.forEach(([audio,event,handler])=>audio.removeEventListener(event,handler));}
-  }
-  root.PibuVoiceMixer=VoiceMixer;
-  if(typeof module!=='undefined'&&module.exports)module.exports=VoiceMixer;
+'use strict';
+class VoiceMixer {
+ constructor(tracks,options={}) {
+  this.options=options;this.tracks=tracks.map(t=>({...t,volume:options.saved?.tracks?.[t.id]?.volume??80,solo:options.saved?.tracks?.[t.id]?.solo??false,muted:options.saved?.tracks?.[t.id]?.muted??false}));
+  this.position=options.saved?.time||0;this.masterVolume=options.saved?.masterVolume??80;this.pitch=options.saved?.pitch||0;
+  this.onUpdate=options.onUpdate||(()=>{});this.onError=options.onError||(()=>{});this.generation=0;this.playing=false;this.started=false;this.preparing=false;this.destroyed=false;this.abort=new AbortController();
+  this.applyVolumes();this.timer=setInterval(()=>this.update(),150);
+ }
+ get ready(){return this.tracks.length>0&&this.tracks.every(t=>t.buffer||t.url);}
+ get metadataReady(){return this.tracks.length>0&&this.tracks.every(t=>t.buffer);}
+ get loadedCount(){return this.tracks.filter(t=>t.buffer).length;}
+ get duration(){return Math.max(0,...this.tracks.map(t=>t.buffer?.duration||0));}
+ get time(){return Math.min(this.duration||Infinity,this.position+(this.started?Math.max(0,this.context.currentTime-this.scheduledAt):0));}
+ get buffering(){return this.preparing;}
+ ensureContext(){
+  if(this.context)return;
+  const Context=root.AudioContext||root.webkitAudioContext;
+  if(!Context&&!this.options.contextFactory)throw Error('Este navegador não oferece mixagem de áudio.');
+  const ctx=this.context=this.options.contextFactory?this.options.contextFactory():new Context({sampleRate:44100,latencyHint:'interactive'});
+  this.bus=ctx.createGain();this.gate=ctx.createGain();this.master=ctx.createGain();
+  // Constant headroom prevents clipping without pumping as voices enter or leave.
+  this.bus.gain.value=1/this.tracks.length;this.gate.gain.value=0;
+  this.bus.connect(this.gate);this.gate.connect(this.master);this.master.connect(ctx.destination);
+  for(const t of this.tracks){t.gain=ctx.createGain();t.gain.connect(this.bus);}this.applyVolumes();
+  ctx.onstatechange=()=>{if(this.started&&ctx.state!=='running'&&!this.destroyed){this.pause();this.onError('Áudio interrompido pelo dispositivo. Toque em Reproduzir para continuar.');}};
+ }
+ async prepare(){
+  if(this.metadataReady)return;if(this.preparePromise)return this.preparePromise;
+  this.preparePromise=(async()=>{
+   // Sequential decoding limits temporary memory on phones. Never start a partial mix.
+   for(const t of this.tracks){
+    if(this.destroyed)return;if(t.buffer)continue;t.loading=true;t.error=null;this.update();
+    try{const response=await (this.options.fetch||root.fetch.bind(root))(t.url,{signal:this.abort.signal});if(!response.ok)throw Error('HTTP '+response.status);const bytes=await response.arrayBuffer();if(this.destroyed)return;const buffer=await this.context.decodeAudioData(bytes);if(this.destroyed)return;t.buffer=buffer;}
+    catch(error){t.error=error;throw Error('Não foi possível preparar todas as pistas. Toque em Reproduzir para tentar novamente.');}
+    finally{t.loading=false;this.update();}
+   }
+  })();
+  try{await this.preparePromise;}finally{this.preparePromise=null;}
+ }
+ applyVolumes(){const solo=this.tracks.some(t=>t.solo);for(const t of this.tracks){t.effectiveMuted=t.muted||(solo&&!t.solo);if(t.gain)t.gain.gain.setTargetAtTime(t.effectiveMuted?0:t.volume/100,this.context.currentTime,.005);}if(this.master)this.master.gain.setTargetAtTime(this.masterVolume/100,this.context.currentTime,.005);}
+ setMasterVolume(v){this.masterVolume=Math.max(0,Math.min(100,Number(v)||0));this.applyVolumes();this.update();}
+ setTrackVolume(id,v){const t=this.tracks.find(t=>t.id===id);if(t){t.volume=Math.max(0,Math.min(100,Number(v)||0));this.applyVolumes();this.update();}}
+ toggleSolo(id){const t=this.tracks.find(t=>t.id===id);if(t){t.solo=!t.solo;this.applyVolumes();this.update();}}
+ toggleMute(id){const t=this.tracks.find(t=>t.id===id);if(t){t.muted=!t.muted;this.applyVolumes();this.update();}}
+ async routePitch(value,generation){
+  let processor=null;
+  if(value){if(!this.options.createPitchProcessor)throw Error('O transpositor ainda está carregando. Tente novamente.');processor=await this.options.createPitchProcessor(this.context);processor.pitchSemitones.setValueAtTime(value,this.context.currentTime);}
+  if(this.destroyed||generation!==this.generation){processor?.disconnect();processor?.port?.close();return false;}
+  this.bus.disconnect();this.processor?.disconnect();this.processor?.port?.close();this.processor=processor;
+  if(processor){this.bus.connect(processor);processor.connect(this.gate);}else this.bus.connect(this.gate);return true;
+ }
+ async play(){
+  if(this.destroyed||this.playing||!this.ready)return;
+  const generation=++this.generation;this.playing=true;this.preparing=true;this.update();
+  try{
+   this.ensureContext();
+   // Unlock the single device synchronously in the user's original tap (iOS).
+   const unlocked=this.context.resume();await unlocked;await this.prepare();
+   if(this.destroyed||generation!==this.generation)return;
+   if(!await this.routePitch(this.pitch,generation))return;
+   if(this.position>=this.duration)this.position=0;
+   const when=this.context.currentTime+.06;this.scheduledAt=when;this.preparing=false;this.started=true;
+   this.gate.gain.cancelScheduledValues(this.context.currentTime);this.gate.gain.setValueAtTime(0,this.context.currentTime);this.gate.gain.setValueAtTime(1,when);
+   const active=this.tracks.filter(t=>t.buffer.duration>this.position);
+   for(const t of active){
+    const source=this.context.createBufferSource();source.buffer=t.buffer;source.connect(t.gain);t.source=source;
+    source.onended=()=>{if(this.destroyed||generation!==this.generation)return;t.source=null;source.disconnect();if(active.every(track=>!track.source)){this.position=this.duration;this.started=false;this.playing=false;this.gate.gain.value=0;this.update();}};
+    source.start(when,this.position);
+   }
+   this.update();
+  }catch(error){if(!this.destroyed&&generation===this.generation){this.pause();this.onError(error.message||'Não foi possível iniciar a mixagem.');}}
+ }
+ pause(){this.position=this.time;this.generation++;this.playing=false;this.started=false;this.preparing=false;if(this.gate){this.gate.gain.cancelScheduledValues(this.context.currentTime);this.gate.gain.setValueAtTime(0,this.context.currentTime);}for(const t of this.tracks){if(t.source){t.source.onended=null;try{t.source.stop();}catch(_error){}t.source.disconnect();t.source=null;}}this.update();}
+ toggle(){return this.playing?this.pause():this.play();}
+ seek(v){const resume=this.playing;this.pause();this.position=Math.max(0,Math.min(this.duration,Number(v)||0));this.update();if(resume&&this.position<this.duration)return this.play();}
+ async setPitch(v){const next=Math.max(-6,Math.min(6,Number(v)||0)),previous=this.pitch,resume=this.playing;this.pause();this.pitch=next;try{if(this.context&&!resume&&!await this.routePitch(next,this.generation))return;this.update();if(resume)return this.play();}catch(error){this.pitch=previous;this.onError(error.message);if(resume)return this.play();}}
+ snapshot(){return {time:this.time,masterVolume:this.masterVolume,pitch:this.pitch,tracks:Object.fromEntries(this.tracks.map(t=>[t.id,{volume:t.volume,solo:t.solo,muted:t.muted}]))};}
+ update(){if(!this.destroyed)this.onUpdate(this);}
+ destroy(){if(this.destroyed)return;this.pause();this.destroyed=true;clearInterval(this.timer);this.abort.abort();this.processor?.disconnect();this.processor?.port?.close();for(const t of this.tracks){t.gain?.disconnect();t.buffer=null;}this.bus?.disconnect();this.gate?.disconnect();this.master?.disconnect();if(this.context){this.context.onstatechange=null;void this.context.close().catch(()=>{});}}
+}
+root.PibuVoiceMixer=VoiceMixer;if(typeof module!=='undefined'&&module.exports)module.exports=VoiceMixer;
 })(typeof window!=='undefined'?window:globalThis);

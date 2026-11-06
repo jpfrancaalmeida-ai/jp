@@ -67,7 +67,8 @@ test('mixer oferece transposição geral e uma única linha do tempo', () => {
 
 test('transpositor usa AudioWorklet local e não muda a velocidade do elemento', () => {
   assert.match(transposer, /new SoundTouchNode/);
-  assert.match(transposer, /pitchSemitones\.setValueAtTime/);
+  assert.match(transposer, /createBus/);
+  assert.doesNotMatch(transposer, /createMediaElementSource|new AudioContext/);
   assert.doesNotMatch(transposer, /audio\.playbackRate\s*=/);
   assert.match(soundTouchNode, /class SoundTouchNode extends AudioWorkletNode/);
   assert.match(soundTouchProcessor, /registerProcessor/);
