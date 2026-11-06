@@ -12,6 +12,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script type="module" src="./audio-transposer.js?v=20261106-2"></script>
 <script src="./asset-reader.js?v=20261106-1"></script>
+<script src="./repertoire.js?v=20261106-1"></script>
+<link rel="stylesheet" href="./repertoire.css?v=20261106-1">
 <script src="./voice-mixer.js?v=20261106-4"></script>
 <link rel="stylesheet" href="./voice-mixer.css?v=20261106-3">
 <script>
@@ -479,7 +481,8 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <input class="input" id="searchInput" placeholder="Buscar música ou artista...">
       </div>
-      <select class="input" id="filterTom"><option value="">Todos os tons</option></select>
+      <select class="input" id="filterTom" aria-label="Filtrar por tom"><option value="">Todos os tons</option></select>
+      <select class="input" id="filterStyle" aria-label="Filtrar por estilo"><option value="">Todos os estilos</option></select>
     </div>
     <div class="song-list" id="songList"></div>
   </section>
@@ -1104,13 +1107,15 @@ function tagDef(id){ return state.tagDefs.find(t=>t.id===id); }
 function renderCatalog(){
   const byCategory = state.songs.filter(s=>(s.category||'musica') === state.catFilter);
   renderTomFilterOptions(byCategory);
-  const q = (document.getElementById('searchInput').value||'').toLowerCase();
-  const tomFilter = document.getElementById('filterTom').value;
-  const filtered = byCategory.filter(s=>{
-    const matchQ = !q || s.title.toLowerCase().includes(q) || (s.artist||'').toLowerCase().includes(q);
-    const matchTom = !tomFilter || s.tom === tomFilter;
-    return matchQ && matchTom;
-  }).sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'));
+  const styleSelect=document.getElementById('filterStyle');
+  const previousStyle=styleSelect.value;
+  const availableStyles=Object.entries(window.PibuRepertoire.styleLabels).filter(([key])=>byCategory.some(song=>song.worshipStyle===key));
+  styleSelect.innerHTML='<option value="">Todos os estilos</option>'+availableStyles.map(([key,label])=>`<option value="${key}">${escapeHtml(label)}</option>`).join('');
+  if(availableStyles.some(([key])=>key===previousStyle))styleSelect.value=previousStyle;
+  const q=(document.getElementById('searchInput').value||'').trim();
+  const tomFilter=document.getElementById('filterTom').value;
+  const styleFilter=styleSelect.value;
+  const filtered=window.PibuRepertoire.filterSongs(state.songs,{category:state.catFilter,query:q,key:tomFilter,style:styleFilter});
 
   const catLabel = state.catFilter === 'hino' ? 'hino' : 'música';
   document.getElementById('catalogCount').textContent = byCategory.length
@@ -1131,12 +1136,22 @@ function renderCatalog(){
     return;
   }
 
-  list.innerHTML = filtered.map(s=>`
-    <div class="song-card">
+  const previousOpen=list.querySelector('#occasionalSongs')?.open||false;
+  const grouped=window.PibuRepertoire.groupSongs(filtered);
+  const renderGroup=(title,items)=>items.length?`<section class="repertoire-section" aria-label="${escapeHtml(title)}"><h3 class="repertoire-heading">${escapeHtml(title)} <span>${items.length}</span></h3>${items.map(renderCatalogSong).join('')}</section>`:'';
+  if(!grouped.frequent.length&&!grouped.occasional.length){list.innerHTML=filtered.map(renderCatalogSong).join('');return;}
+  list.innerHTML=renderGroup('Mais tocadas',grouped.frequent)+renderGroup('Sem classificação',grouped.unclassified)+(grouped.occasional.length?`<details class="occasional-songs" id="occasionalSongs"${previousOpen||q||tomFilter||styleFilter?' open':''}><summary>Ocasionais <span>${grouped.occasional.length}</span></summary><div class="occasional-list">${grouped.occasional.map(renderCatalogSong).join('')}</div></details>`:'');
+}
+
+function renderCatalogSong(s){
+  const completeKit=window.PibuRepertoire.hasCompleteKit(state.voices[s.id]||[]);
+  return `
+    <div class="song-card${completeKit?' has-voice-kit':''}" data-song-id="${escapeHtml(s.id)}">
       <div class="tom-badge">${escapeHtml(s.tom || '—')}</div>
       <div class="song-main">
-        <p class="song-title">${escapeHtml(s.title)}</p>
+        <div class="song-title-line"><p class="song-title">${escapeHtml(s.title)}</p>${completeKit?'<span class="voice-kit-mark" aria-label="Kit de vozes completo" title="Solista, tenor, contralto, soprano, instrumental e metrônomo">● Kit completo</span>':''}</div>
         ${s.artist ? `<p class="song-artist">${escapeHtml(s.artist)}</p>`:''}
+        ${window.PibuRepertoire.styleLabels[s.worshipStyle]?`<span class="song-style">${escapeHtml(window.PibuRepertoire.styleLabels[s.worshipStyle])}</span>`:''}
         ${s.tags && s.tags.length ? `<div class="song-tags">${s.tags.map(id=>{const td=tagDef(id); return td ? `<span class="tag" style="border-color:${td.color}; color:${td.color};">${escapeHtml(td.name)}</span>` : '';}).join('')}</div>`:''}
       </div>
       <div class="song-actions">
@@ -1164,7 +1179,7 @@ function renderCatalog(){
         ` : ''}
       </div>
     </div>
-  `).join('');
+  `;
 }
 
 function emptyState(iconPath, title, msg){
@@ -1223,6 +1238,10 @@ function openSongModal(id){
       <div class="field"><label>Artista / compositor</label><input class="input" id="f_artist" value="${escapeHtml(song?.artist||'')}" placeholder="Ex: Diante do Trono"></div>
       <div class="field" style="max-width:120px;"><label>Tom</label><input class="input mono" id="f_tom" value="${escapeHtml(song?.tom||'')}" placeholder="Ex: G"></div>
     </div>
+    <div class="field-row">
+      <div class="field"><label for="f_frequency">Frequência no repertório</label><select class="input" id="f_frequency"><option value="">Sem classificação</option>${Object.entries(window.PibuRepertoire.frequencyLabels).map(([value,label])=>`<option value="${value}" ${song?.repertoireFrequency===value?'selected':''}>${label}</option>`).join('')}</select></div>
+      <div class="field"><label for="f_style">Estilo</label><select class="input" id="f_style"><option value="">Sem classificação</option>${Object.entries(window.PibuRepertoire.styleLabels).map(([value,label])=>`<option value="${value}" ${song?.worshipStyle===value?'selected':''}>${label}</option>`).join('')}</select></div>
+    </div>
     <div class="field">
       <label>Tags</label>
       <div id="f_tagsWrap">${renderTagCheckboxes(selectedTags)}</div>
@@ -1269,10 +1288,17 @@ async function saveSong(id){
   const tags = [...document.querySelectorAll('#f_tagsWrap input[type="checkbox"]:checked')].map(i=>i.value);
   const chordLink = document.getElementById('f_link').value.trim();
   const streamLinks = window._streamLinksDraft || [];
+  const repertoireFrequency=document.getElementById('f_frequency').value;
+  const worshipStyle=document.getElementById('f_style').value;
+  const classifications={};
+  if(Object.hasOwn(window.PibuRepertoire.frequencyLabels,repertoireFrequency))classifications.repertoireFrequency=repertoireFrequency;
+  if(Object.hasOwn(window.PibuRepertoire.styleLabels,worshipStyle))classifications.worshipStyle=worshipStyle;
+
 
   const nextSongs = id
-    ? state.songs.map(s=>s.id===id ? {...s,title,artist,tom,tags,chordLink,category,streamLinks} : s)
-    : state.songs.concat({id:uid(),title,artist,tom,tags,chordLink,category,streamLinks});
+    ? state.songs.map(s=>s.id===id ? {...s,title,artist,tom,tags,chordLink,category,streamLinks,...classifications} : s)
+    : state.songs.concat({id:uid(),title,artist,tom,tags,chordLink,category,streamLinks,...classifications});
+  if(id){const edited=nextSongs.find(song=>song.id===id);if(!repertoireFrequency)delete edited.repertoireFrequency;if(!worshipStyle)delete edited.worshipStyle;}
   await saveKey('songs__v1', nextSongs);
   state.songs = nextSongs;
   closeModal();
@@ -1361,6 +1387,7 @@ async function deleteSong(id){
 
 document.getElementById('searchInput').addEventListener('input', renderCatalog);
 document.getElementById('filterTom').addEventListener('change', renderCatalog);
+document.getElementById('filterStyle').addEventListener('change', renderCatalog);
 
 /* ================= MURAL ================= */
 function muralSetlistHtml(m, isPast){
@@ -2193,6 +2220,7 @@ async function saveVoiceEdit(songId, voiceId){
     const filter = document.getElementById('voz_filter');
     if(filter) filter.innerHTML = voiceFilterOptions(songId);
     renderVozesList(songId);
+    renderCatalog();
     renderCatalog();
     showToast('Voz atualizada.');
   }catch(error){

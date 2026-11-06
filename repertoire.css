@@ -1,0 +1,13 @@
+.repertoire-section{margin-bottom:22px;}
+.repertoire-section>.song-card+.song-card,.occasional-list>.song-card+.song-card{margin-top:9px;}
+.repertoire-heading{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13px;font-weight:600;color:var(--ink-soft);}
+.repertoire-heading span,.occasional-songs summary span{font:500 11px 'JetBrains Mono',monospace;color:var(--muted);}
+.occasional-songs{margin-top:16px;border-top:1px solid var(--line);padding-top:14px;}
+.occasional-songs summary{cursor:pointer;padding:7px 0;font-size:14px;font-weight:600;}
+.occasional-songs summary span{margin-left:7px;}
+.occasional-list{margin-top:12px;}
+.song-title-line{display:flex;align-items:baseline;flex-wrap:wrap;gap:3px 9px;}
+.has-voice-kit .song-title{color:#16744a;font-weight:700;}
+.voice-kit-mark{display:inline-flex;align-items:center;white-space:nowrap;color:#16744a;font:600 10px 'JetBrains Mono',monospace;}
+.song-style{display:inline-block;margin-top:5px;font:500 10px 'JetBrains Mono',monospace;color:var(--ink-soft);}
+@media(max-width:560px){.song-title-line{gap:3px 7px;}.voice-kit-mark{font-size:9.5px;}.occasional-songs summary{padding:12px 0;}}

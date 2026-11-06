@@ -66,3 +66,11 @@ O AudioContext usa a frequência nativa do dispositivo e `latencyHint: playback`
 - Diretório publicado pelo Netlify: raiz do repositório.
 - Regras do Firebase devem ser revisadas e implantadas antes do novo frontend.
 - Nunca publicar primeiro o frontend que exige autenticação sem que Authentication, Firestore Rules e Storage Rules estejam prontos.
+
+## Classificações do repertório
+
+- `repertoireFrequency`: `frequent` (Mais tocadas) ou `occasional` (Ocasionais). A segunda seção fica recolhida inicialmente; a busca e os filtros a expandem para mostrar resultados.
+- `worshipStyle`: `celebracao` ou `adoracao`, com identificação no cartão, filtro e edição pela liderança.
+- A categoria original `musica`/`hino` permanece independente. Itens ainda sem classificação continuam acessíveis; se toda a lista não possuir frequência, ela mantém a apresentação simples.
+- O destaque verde “Kit completo” é calculado a partir das vozes atuais, exigindo Melodia/Solista, Tenor, Contralto, Soprano, Instrumental e Metrônomo. Barítono e duplicatas não alteram o critério; uploads incompletos não contam.
+- `repertoire.js` concentra agrupamento, busca, critério do kit e mesclagem de categorias por ID. Alterações de categorias preservam todos os outros campos e itens.
