@@ -1,5 +1,16 @@
 # Louvor PIBU
 
+## Mixer de vozes
+
+- As faixas usam uma única linha do tempo, com reprodução, pausa e retorno ao início em conjunto.
+- Cada faixa oferece Solo (S), Mute (M) e volume independente. Várias faixas podem ficar em solo ao mesmo tempo; Mute tem prioridade.
+- Faixas silenciadas continuam acompanhando a posição da música, para voltarem no instante correto.
+- Há volume geral e transposição conjunta de -6 a +6 semitons, sem mudar a velocidade.
+- O filtro “Exibir” muda apenas as faixas visíveis; Solo e Mute controlam a mixagem.
+- Fechar o modal interrompe a reprodução. Editar uma identificação preserva a posição e os volumes, pausando o conjunto.
+- `voice-mixer.js` concentra o controle de reprodução; `voice-mixer.css` define o layout responsivo.
+- `npm test` inclui testes de sincronização, busca, volume, solo/mute, buffering e encerramento durante reprodução pendente.
+
 Aplicativo estático do ministério de louvor, publicado no Netlify e conectado ao Firebase.
 
 ## Persistência

@@ -11,6 +11,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script type="module" src="./audio-transposer.js"></script>
+<script src="./voice-mixer.js"></script>
+<link rel="stylesheet" href="./voice-mixer.css">
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyCINdLifPvAaPvbl3qLLV-bCPL2_Vpd0do",
@@ -1024,6 +1026,8 @@ function openModal(html){
   document.getElementById('overlay').classList.add('show');
 }
 function closeModal(){
+  destroyVoiceMixer();
+  document.querySelector('.modal')?.classList.remove('voice-mixer-modal');
   window.PibuTransposer?.disposeWithin(document.getElementById('modalContent'));
   document.getElementById('overlay').classList.remove('show');
 }
@@ -1848,18 +1852,21 @@ async function deleteApoio(songId, itemId){
 }
 
 /* ================= VOZES ================= */
-const VOZ_TIPOS = ['Melodia','Tenor','Contralto','Soprano'];
+const VOZ_TIPOS = ['Melodia','Barítono','Tenor','Contralto','Soprano','Instrumental','Metrônomo'];
 
 function openVozesModal(songId){
   const song = state.songs.find(s=>s.id===songId);
   if(!song) return;
+  destroyVoiceMixer();
+  voiceMixSaved = null;
+  voiceMixError = '';
   state.voiceFilter = 'Todos';
   state.editingVoiceId = null;
   openModal(`
     <div class="voz-modal-head">
       <div class="voz-modal-title"><h3>Vozes — ${escapeHtml(song.title)}</h3></div>
       <div class="voz-filter">
-        <label for="voz_filter">Filtrar</label>
+        <label for="voz_filter">Exibir</label>
         <select class="input" id="voz_filter" onchange="setVoiceFilter('${songId}',this.value)">
           ${voiceFilterOptions(songId)}
         </select>
@@ -1915,134 +1922,143 @@ function voiceFilterOptions(songId){
 
 function setVoiceFilter(songId, type){
   state.voiceFilter = ['Todos',...VOZ_TIPOS].includes(type) ? type : 'Todos';
-  state.editingVoiceId = null;
-  renderVozesList(songId);
+  document.querySelectorAll('#vozListWrap .mix-track').forEach(row=>{ row.hidden=state.voiceFilter!=='Todos'&&row.dataset.voiceType!==state.voiceFilter; });
+}
+
+let voiceMixer = null;
+let voiceMixSaved = null;
+let voiceMixError = '';
+
+function destroyVoiceMixer(){
+  if(!voiceMixer) return;
+  voiceMixer.pause();
+  voiceMixSaved = voiceMixer.snapshot();
+  voiceMixer.destroy();
+  voiceMixer = null;
+}
+
+function mixTime(seconds){
+  const value = Math.max(0,Math.floor(Number(seconds)||0));
+  return `${Math.floor(value/60)}:${String(value%60).padStart(2,'0')}`;
 }
 
 function renderVozesList(songId){
   const wrap = document.getElementById('vozListWrap');
   if(!wrap) return;
-  clearVoiceGroupSync();
+  wrap.dataset.songId = songId;
+  destroyVoiceMixer();
   window.PibuTransposer?.disposeWithin(wrap);
-  const vozes = state.voices[songId] || [];
-  if(vozes.length === 0){
-    wrap.innerHTML = `<p class="voz-empty">Nenhuma voz adicionada ainda.</p>`;
-    return;
-  }
-  const filteredVoices = state.voiceFilter==='Todos' ? vozes : vozes.filter(voice=>voice.tipo===state.voiceFilter);
-  if(filteredVoices.length === 0){
-    wrap.innerHTML = `<p class="voz-empty">Nenhum áudio de ${escapeHtml(state.voiceFilter.toLowerCase())} nesta música.</p>`;
-    return;
-  }
-  const groupLabel = state.voiceFilter==='Todos' ? `${filteredVoices.length} vozes` : `${filteredVoices.length} ${state.voiceFilter.toLowerCase()}`;
-  wrap.innerHTML = `<div style="margin-bottom:6px;">
-    ${filteredVoices.length>1 ? `<div class="voz-group-player">
-      <div class="voz-group-copy">
-        <span class="voz-group-title">Ouvir em conjunto</span>
-        <span class="voz-group-hint">${escapeHtml(groupLabel)} sincronizadas</span>
+  const voices = state.voices[songId] || [];
+  const song = state.songs.find(item=>item.id===songId);
+  document.querySelector('.modal')?.classList.add('voice-mixer-modal');
+  if(voices.length===0){ wrap.innerHTML='<p class="voz-empty">Nenhuma voz adicionada ainda.</p>'; return; }
+  const sourceKeys = [...new Set(voices.map(voice=>voice.sourceKey).filter(Boolean))];
+  const originalKey = sourceKeys.length===1 ? sourceKeys[0] : sourceKeys.length>1 ? '' : song?.tom||'';
+  wrap.innerHTML = `<div class="voice-mixer">
+    <section class="mix-console" aria-label="Reprodução de todas as faixas">
+      <p class="mix-eyebrow">Ouvir em conjunto</p>
+      <h4>${escapeHtml(song?.title||'Vozes')}</h4>
+      <p class="mix-description">Uma linha do tempo para todas as vozes.</p>
+      <div class="mix-pitch" aria-label="Tom de todas as faixas">
+        <button type="button" id="mix-pitch-down" onclick="changeMixPitch(-1)" aria-label="Diminuir um semitom em todas as faixas">−</button>
+        <button type="button" class="mix-key" id="mix-pitch-reset" data-original-key="${escapeHtml(originalKey)}" onclick="resetMixPitch()" aria-label="Voltar ao tom original">Original${originalKey?' · '+escapeHtml(originalKey):''}</button>
+        <button type="button" id="mix-pitch-up" onclick="changeMixPitch(1)" aria-label="Aumentar um semitom em todas as faixas">+</button>
       </div>
-      <button class="btn btn-dark btn-sm" id="voz_group_toggle" onclick="toggleVoiceGroupPlay('${songId}')" aria-label="Tocar todas as vozes">
-        <svg class="voz-group-icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7Z"/></svg>
-        <span>Tocar todas</span>
-      </button>
-    </div>` : ''}
-    ${filteredVoices.map(v=>`
-    <div class="voz-row">
-      <div class="voz-row-head">
-        <div class="voz-meta">
-          <span class="voz-type-badge">${escapeHtml(v.tipo||'Voz')}</span>
-          <span class="voz-name ${v.nome?'':'is-empty'}" title="${escapeHtml(v.nome||'Sem identificação')}">${escapeHtml(v.nome||'Sem identificação')}</span>
+      <label class="sr-only" for="mix-timeline">Posição de todas as faixas</label>
+      <input class="mix-timeline" id="mix-timeline" type="range" min="0" max="0" step="0.1" value="0" oninput="seekVoiceMix(this.value)" disabled>
+      <div class="mix-times"><span id="mix-current">0:00</span><span id="mix-duration">0:00</span></div>
+      <div class="mix-transport">
+        <button type="button" class="mix-restart" onclick="restartVoiceMix()" aria-label="Voltar ao início de todas as faixas">↺</button>
+        <button type="button" class="mix-play" id="voz_group_toggle" onclick="toggleVoiceGroupPlay('${songId}')" aria-label="Reproduzir todas as faixas" disabled>▶ Reproduzir</button>
+      </div>
+      <div class="mix-master">
+        <label for="mix-master-volume">Volume geral</label>
+        <input id="mix-master-volume" type="range" min="0" max="100" step="1" value="80" oninput="setMixMasterVolume(this.value)">
+        <output id="mix-master-value" for="mix-master-volume">80%</output>
+      </div>
+      <p class="mix-status" id="mix-status" role="status">Carregando as faixas…</p>
+    </section>
+    <section class="mix-tracks" aria-label="Controles por faixa">
+      <h4 class="mix-tracks-title">${voices.length} faixas · Solo / Mute</h4>
+      ${voices.map(voice=>`<article class="mix-track" data-voice-id="${escapeHtml(voice.id)}" data-voice-type="${escapeHtml(voice.tipo||'Melodia')}">
+        <div class="mix-track-head">
+          <div class="mix-track-copy"><p class="mix-track-name">${escapeHtml(voice.tipo||'Voz')}</p><p class="mix-track-detail">${escapeHtml(voice.nome||'Sem identificação')}</p></div>
+          <div class="mix-toggles">
+            <button type="button" class="mix-toggle" data-mix-action="solo" aria-pressed="false" aria-label="Solar ${escapeHtml(voice.tipo||'voz')}" onclick="toggleMixSolo('${voice.id}')">S</button>
+            <button type="button" class="mix-toggle" data-mix-action="mute" aria-pressed="false" aria-label="Mutar ${escapeHtml(voice.tipo||'voz')}" onclick="toggleMixMute('${voice.id}')">M</button>
+          </div>
         </div>
-        ${state.isAdmin ? `<div class="voz-actions">
-          <button class="icon-btn" onclick="startEditVoice('${songId}','${v.id}')" aria-label="Editar ${escapeHtml(v.nome||v.tipo||'voz')}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-          </button>
-          <button class="icon-btn" onclick="deleteVoz('${songId}','${v.id}')" aria-label="Remover ${escapeHtml(v.nome||v.tipo||'voz')}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
-          </button>
-        </div>` : ''}
-      </div>
-      ${state.editingVoiceId===v.id ? renderVoiceEditForm(songId,v) : ''}
-      ${v.url||v.dataUrl||v.objectUrl
-        ? `<div class="voz-player">
-            <audio id="voz_audio_${v.id}" data-transposer-id="${v.id}" class="voz-audio" controls preload="metadata" src="${escapeHtml(v.url||v.dataUrl||v.objectUrl)}" onplay="updateVoiceGroupButton('${songId}')" onpause="updateVoiceGroupButton('${songId}')" onended="updateVoiceGroupButton('${songId}')"></audio>
-            <div class="transposer" aria-label="Transpositor de tom">
-              <span class="transposer-label">Tom</span>
-              <button class="transposer-btn" onclick="adjustVoicePitch('${songId}','${v.id}',-1)" aria-label="Diminuir um semitom">−</button>
-              <input id="voz_pitch_${v.id}" class="transposer-range" type="range" min="-6" max="6" step="1" value="${Number(v.pitchSemitones)||0}" oninput="setVoicePitch('${songId}','${v.id}',this.value)" aria-label="Transposição em semitons">
-              <button class="transposer-btn" onclick="adjustVoicePitch('${songId}','${v.id}',1)" aria-label="Aumentar um semitom">+</button>
-              <button id="voz_pitch_value_${v.id}" class="transposer-state ${(Number(v.pitchSemitones)||0)===0?'is-original':'is-shifted'}" onclick="setVoicePitch('${songId}','${v.id}',0)" title="Voltar ao tom original" aria-label="${(Number(v.pitchSemitones)||0)===0?'Tom original':'Voltar ao tom original'}">
-                <span class="transposer-state-dot"></span><span class="transposer-state-text">${pitchLabel(Number(v.pitchSemitones)||0)}</span>
-              </button>
-              <span id="voz_pitch_status_${v.id}" class="sr-only" aria-live="polite"></span>
-            </div>
-          </div>`
-        : `<span class="hint" style="flex:1;">${v.loadError?'Falha ao carregar o áudio.':'Carregando áudio…'}</span>`}
-    </div>`).join('')}</div>`;
-}
-
-let voiceGroupSyncTimer = null;
-
-function visibleVoiceAudios(){
-  return Array.from(document.querySelectorAll('#vozListWrap .voz-audio'));
-}
-
-function clearVoiceGroupSync(){
-  if(voiceGroupSyncTimer){
-    clearInterval(voiceGroupSyncTimer);
-    voiceGroupSyncTimer = null;
-  }
-}
-
-function updateVoiceGroupButton(songId){
-  const button = document.getElementById('voz_group_toggle');
-  if(!button) return;
-  const isPlaying = visibleVoiceAudios().some(audio=>!audio.paused&&!audio.ended);
-  button.innerHTML = isPlaying
-    ? `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg><span>Pausar todas</span>`
-    : `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7Z"/></svg><span>Tocar todas</span>`;
-  button.setAttribute('aria-label',isPlaying?'Pausar todas as vozes':'Tocar todas as vozes');
-}
-
-function startVoiceGroupSync(songId, audios){
-  clearVoiceGroupSync();
-  voiceGroupSyncTimer = setInterval(()=>{
-    if(!document.getElementById('voz_group_toggle')){ clearVoiceGroupSync(); return; }
-    const playing = audios.filter(audio=>audio.isConnected&&!audio.paused&&!audio.ended);
-    if(playing.length===0){ clearVoiceGroupSync(); updateVoiceGroupButton(songId); return; }
-    if(playing.length<2) return;
-    const masterTime = playing[0].currentTime;
-    playing.slice(1).forEach(audio=>{
-      if(Math.abs(audio.currentTime-masterTime)>0.12){
-        try{ audio.currentTime=masterTime; }catch(_error){}
-      }
-    });
-  },500);
-}
-
-async function toggleVoiceGroupPlay(songId){
-  const button = document.getElementById('voz_group_toggle');
-  const audios = visibleVoiceAudios();
-  if(!button||audios.length<2) return;
-  if(audios.some(audio=>!audio.paused&&!audio.ended)){
-    audios.forEach(audio=>audio.pause());
-    clearVoiceGroupSync();
-    updateVoiceGroupButton(songId);
-    return;
-  }
-  button.disabled = true;
-  clearVoiceGroupSync();
-  audios.forEach(audio=>{
-    audio.pause();
-    try{ audio.currentTime=0; }catch(_error){}
+        <div class="mix-track-volume">
+          <input type="range" min="0" max="100" step="1" value="80" data-mix-volume aria-label="Volume de ${escapeHtml(voice.tipo||'voz')}" oninput="setMixTrackVolume('${voice.id}',this.value)">
+          <output data-mix-volume-value>80%</output>
+        </div>
+        <p class="mix-track-state" data-mix-state>Carregando áudio…</p>
+        <audio id="voz_audio_${voice.id}" data-transposer-id="${voice.id}" preload="auto" ${voice.url||voice.dataUrl||voice.objectUrl?`src="${escapeHtml(voice.url||voice.dataUrl||voice.objectUrl)}"`:''}></audio>
+        ${state.isAdmin?`<div class="voz-actions"><button class="icon-btn" onclick="startEditVoice('${songId}','${voice.id}')" aria-label="Editar ${escapeHtml(voice.nome||voice.tipo||'voz')}">✎</button><button class="icon-btn" onclick="deleteVoz('${songId}','${voice.id}')" aria-label="Remover ${escapeHtml(voice.nome||voice.tipo||'voz')}">×</button></div>`:''}
+        ${state.editingVoiceId===voice.id?renderVoiceEditForm(songId,voice):''}
+      </article>`).join('')}
+    </section>
+  </div>`;
+  const mixerTracks = voices.map(voice=>({id:voice.id,audio:document.getElementById(`voz_audio_${voice.id}`)}));
+  voiceMixer = new window.PibuVoiceMixer(mixerTracks,{
+    saved:voiceMixSaved,
+    onUpdate:updateVoiceMixerUI,
+    onError:message=>{ voiceMixError=message; document.getElementById('mix-status').textContent=message; },
+    applyPitch:(audio,id,value)=>{
+      if(!window.PibuTransposer) return Promise.reject(new Error('O transpositor ainda está carregando. Tente novamente.'));
+      return window.PibuTransposer.setPitch(audio,id,value);
+    }
   });
-  const results = await Promise.allSettled(audios.map(audio=>audio.play()));
-  const started = audios.filter((audio,index)=>results[index].status==='fulfilled'&&!audio.paused);
-  button.disabled = false;
-  updateVoiceGroupButton(songId);
-  if(started.length>1) startVoiceGroupSync(songId,started);
-  if(started.length!==audios.length) showToast('Algumas vozes não puderam ser reproduzidas.');
+  setVoiceFilter(songId,state.voiceFilter||'Todos');
 }
+
+function updateVoiceMixerUI(mixer){
+  const wrap=document.getElementById('vozListWrap');
+  const timeline=document.getElementById('mix-timeline');
+  if(!wrap||!timeline) return;
+  timeline.max=mixer.duration||0;
+  timeline.value=mixer.time;
+  timeline.disabled=!mixer.ready;
+  timeline.setAttribute('aria-valuetext',`${mixTime(mixer.time)} de ${mixTime(mixer.duration)}`);
+  document.getElementById('mix-current').textContent=mixTime(mixer.time);
+  document.getElementById('mix-duration').textContent=mixTime(mixer.duration);
+  const play=document.getElementById('voz_group_toggle');
+  play.disabled=!mixer.ready;
+  play.textContent=mixer.playing?'Ⅱ Pausar':'▶ Reproduzir';
+  play.setAttribute('aria-label',mixer.playing?'Pausar todas as faixas':'Reproduzir todas as faixas');
+  document.getElementById('mix-master-volume').value=mixer.masterVolume;
+  document.getElementById('mix-master-value').textContent=mixer.masterVolume+'%';
+  const pitch=document.getElementById('mix-pitch-reset');
+  pitch.textContent=mixer.pitch===0?'Original'+(pitch.dataset.originalKey?' · '+pitch.dataset.originalKey:''):pitchLabel(mixer.pitch);
+  document.getElementById('mix-pitch-down').disabled=!mixer.ready||mixer.pitch<=-6;
+  document.getElementById('mix-pitch-up').disabled=!mixer.ready||mixer.pitch>=6;
+  pitch.disabled=!mixer.ready;
+  const statusText=voiceMixError||(mixer.buffering?'Aguardando as faixas carregarem…':mixer.ready?`${mixer.tracks.length} faixas sincronizadas. S: solar · M: mutar.`:'Carregando as faixas…');
+  const status=document.getElementById('mix-status');
+  if(status.textContent!==statusText) status.textContent=statusText;
+  for(const track of mixer.tracks){
+    const row=Array.from(wrap.querySelectorAll('.mix-track')).find(item=>item.dataset.voiceId===track.id);
+    if(!row) continue;
+    row.classList.toggle('is-solo',track.solo);
+    row.classList.toggle('is-silent',track.audio.muted||track.volume===0);
+    row.querySelector('[data-mix-action="solo"]').setAttribute('aria-pressed',String(track.solo));
+    row.querySelector('[data-mix-action="mute"]').setAttribute('aria-pressed',String(track.muted));
+    row.querySelector('[data-mix-volume]').value=track.volume;
+    row.querySelector('[data-mix-volume-value]').textContent=track.volume+'%';
+    row.querySelector('[data-mix-state]').textContent=track.audio.error?'Falha ao carregar o áudio.':!track.audio.getAttribute('src')||track.audio.readyState<1?'Carregando áudio…':track.muted?'Mutada':track.audio.muted?'Fora do solo':track.solo?'Em solo':'Pronta';
+  }
+}
+
+function toggleVoiceGroupPlay(){ voiceMixError=''; return voiceMixer?.toggle(); }
+function seekVoiceMix(value){ voiceMixError=''; return voiceMixer?.seek(value); }
+function restartVoiceMix(){ return voiceMixer?.seek(0); }
+function setMixMasterVolume(value){ voiceMixer?.setMasterVolume(value); }
+function setMixTrackVolume(id,value){ voiceMixer?.setTrackVolume(id,value); }
+function toggleMixSolo(id){ voiceMixer?.toggleSolo(id); }
+function toggleMixMute(id){ voiceMixer?.toggleMute(id); }
+function changeMixPitch(delta){ voiceMixError=''; return voiceMixer?.setPitch(voiceMixer.pitch+delta); }
+function resetMixPitch(){ voiceMixError=''; return voiceMixer?.setPitch(0); }
+
 
 function renderVoiceEditForm(songId, voice){
   return `<div class="voz-edit-form">
@@ -2170,7 +2186,7 @@ async function hydrateVoices(songId){
     try{ await assetObjectUrl('songVoices',v); }
     catch(e){ v.loadError=true; console.error('hydrateVoice',v.id,e); }
   }));
-  if(document.getElementById('vozListWrap')) renderVozesList(songId);
+  if(document.getElementById('vozListWrap')?.dataset.songId===songId) renderVozesList(songId);
 }
 
 function vozFileSelected(input){

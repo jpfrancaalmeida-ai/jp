@@ -56,11 +56,13 @@ test('credencial administrativa antiga não está no HTML', () => {
   assert.doesNotMatch(index, /p\s*===\s*['"]1234['"]/);
 });
 
-test('cada voz reproduzível oferece transposição de -6 a +6 semitons', () => {
+test('mixer oferece transposição geral e uma única linha do tempo', () => {
   assert.match(index, /audio-transposer\.js/);
-  assert.match(index, /class="transposer-range" type="range" min="-6" max="6" step="1"/);
-  assert.match(index, /setVoicePitch\(/);
-  assert.match(index, /Tom alterado sem mudar a velocidade/);
+  assert.match(index, /voice-mixer\.js/);
+  assert.match(index, /id="mix-timeline"/);
+  assert.match(index, /id="mix-pitch-reset"/);
+  const voices = index.slice(index.indexOf('function renderVozesList('), index.indexOf('function renderVoiceEditForm('));
+  assert.doesNotMatch(voices, /<audio[^>]*\bcontrols\b/);
 });
 
 test('transpositor usa AudioWorklet local e não muda a velocidade do elemento', () => {
@@ -71,24 +73,21 @@ test('transpositor usa AudioWorklet local e não muda a velocidade do elemento',
   assert.match(soundTouchProcessor, /registerProcessor/);
 });
 
-test('UX de vozes oferece filtro por classificação e indicador compacto de tom', () => {
+test('UX do mixer oferece filtro visual e controles acessíveis por faixa', () => {
   assert.match(index, /id="voz_filter"/);
   assert.match(index, /\['Todos',\.\.\.VOZ_TIPOS\]/);
-  assert.match(index, /class="transposer-state/);
-  assert.match(index, /class="transposer-state-dot"/);
-  assert.match(index, /class="sr-only" aria-live="polite"/);
-  assert.doesNotMatch(index, /class="transposer-reset"/);
-  assert.doesNotMatch(index, /class="transposer-status"/);
+  assert.match(index, /data-mix-action="solo" aria-pressed="false"/);
+  assert.match(index, /data-mix-action="mute" aria-pressed="false"/);
+  assert.match(index, /aria-label="Volume de/);
+  assert.match(index, /id="mix-status" role="status"/);
 });
 
-test('vozes oferecem reprodução conjunta sincronizada e respeitam o filtro visível', () => {
+test('mixer gerencia todas as faixas e é descartado ao fechar o modal', () => {
   assert.match(index, /id="voz_group_toggle"/);
   assert.match(index, /function toggleVoiceGroupPlay/);
-  assert.match(index, /visibleVoiceAudios\(\)/);
-  assert.match(index, /Promise\.allSettled\(audios\.map\(audio=>audio\.play\(\)\)\)/);
-  assert.match(index, /audio\.currentTime=0/);
-  assert.match(index, /Math\.abs\(audio\.currentTime-masterTime\)>0\.12/);
-  assert.match(index, /Pausar todas/);
+  assert.match(index, /new window\.PibuVoiceMixer/);
+  assert.match(index, /function closeModal\(\)\{\s*destroyVoiceMixer\(\)/);
+  assert.match(index, /Pausar todas as faixas/);
 });
 
 test('líder pode editar nome e tipo com confirmação do servidor', () => {

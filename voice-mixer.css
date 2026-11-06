@@ -1,0 +1,51 @@
+.modal.voice-mixer-modal{max-width:1000px;width:100%;}
+.voice-mixer{display:grid;grid-template-columns:minmax(240px,.85fr) minmax(0,1.15fr);gap:22px;align-items:start;}
+.mix-console{background:var(--ink);color:var(--paper);border-radius:16px;padding:24px 20px;position:sticky;top:0;}
+.mix-eyebrow{margin:0 0 8px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#c1bdb4;}
+.mix-console h4{font:500 25px 'Fraunces',serif;margin:0 0 6px;overflow-wrap:anywhere;}
+.mix-description{margin:0;color:#c1bdb4;font-size:12px;line-height:1.6;}
+.mix-pitch{display:flex;align-items:center;justify-content:center;gap:8px;margin:26px 0;}
+.mix-pitch button{color:var(--paper);background:#ffffff12;border:1px solid #ffffff28;border-radius:50%;width:38px;height:38px;font-size:20px;}
+.mix-pitch button.mix-key{border-radius:20px;min-width:116px;width:auto;padding:0 12px;font:500 11px 'JetBrains Mono',monospace;}
+.mix-pitch button:hover{background:#ffffff25;}
+.mix-timeline{display:block;width:100%;accent-color:var(--paper);cursor:pointer;margin:0;}
+.mix-times{display:flex;justify-content:space-between;margin-top:8px;font:11px 'JetBrains Mono',monospace;color:#d0ccc2;}
+.mix-transport{display:flex;align-items:center;justify-content:center;gap:14px;margin:22px 0;}
+.mix-play{display:flex;align-items:center;justify-content:center;gap:7px;border:0;border-radius:30px;min-width:144px;padding:15px 18px;background:var(--paper);color:var(--ink);font-size:13px;font-weight:600;}
+.mix-restart{border:1px solid #ffffff28;background:transparent;color:var(--paper);border-radius:50%;width:42px;height:42px;font-size:21px;}
+.mix-play:disabled,.mix-pitch button:disabled{opacity:.45;cursor:wait;}
+.mix-master{display:grid;grid-template-columns:auto minmax(60px,1fr) 36px;gap:10px;align-items:center;font-size:11px;color:#d0ccc2;}
+.mix-master input{width:100%;min-width:0;accent-color:var(--paper);}
+.mix-master output{text-align:right;font-family:'JetBrains Mono',monospace;}
+.mix-status{font-size:11px;line-height:1.6;color:#d0ccc2;min-height:36px;margin:18px 0 0;}
+.mix-tracks-title{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;}
+.mix-tracks{min-width:0;}
+.mix-track{border:1px solid var(--line);background:var(--paper-raised);border-radius:12px;padding:14px;margin-bottom:10px;}
+.mix-track.is-solo{border-color:#9a751e;box-shadow:inset 3px 0 #9a751e;}
+.mix-track.is-silent .mix-track-copy{opacity:.55;}
+.mix-track-head{display:flex;gap:12px;align-items:center;}
+.mix-track-copy{flex:1;min-width:0;}
+.mix-track-name{font-size:13px;font-weight:600;margin:0 0 4px;}
+.mix-track-detail{font-size:11px;line-height:1.45;color:var(--muted);overflow-wrap:anywhere;margin:0;}
+.mix-toggles{display:flex;gap:6px;flex:none;}
+.mix-toggle{width:36px;height:36px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink-soft);font-size:12px;font-weight:700;}
+.mix-toggle[data-mix-action="solo"][aria-pressed="true"]{background:#f0d175;border-color:#9a751e;color:#332600;}
+.mix-toggle[data-mix-action="mute"][aria-pressed="true"]{background:#9d3434;border-color:#9d3434;color:#fff;}
+.mix-track-volume{display:grid;grid-template-columns:minmax(0,1fr) 40px;gap:10px;align-items:center;margin-top:12px;}
+.mix-track-volume input{min-width:0;width:100%;accent-color:var(--ink);}
+.mix-track-volume output{font:11px 'JetBrains Mono',monospace;text-align:right;color:var(--muted);}
+.mix-track-state{font-size:10px;color:var(--muted);margin:8px 0 0;}
+.mix-track audio{display:none;}
+.mix-track .voz-actions{margin-top:8px;justify-content:flex-end;}
+.mix-track[hidden]{display:none;}
+.voice-mixer button:focus-visible,.voice-mixer input:focus-visible{outline:3px solid #ab8b38;outline-offset:3px;}
+@media(max-width:700px){
+ .voice-mixer{grid-template-columns:minmax(0,1fr);gap:18px;}
+ .mix-console{position:static;padding:20px 18px;}
+ .mix-console h4{font-size:23px;}
+ .mix-pitch{margin:18px 0;}
+ .mix-status{min-height:0;margin-top:14px;}
+ .mix-toggle{width:42px;height:42px;}
+ .voz-modal-title h3{white-space:normal;}
+ .mix-track{padding:12px;}
+}
